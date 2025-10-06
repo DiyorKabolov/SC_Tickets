@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Сканер билетов</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+      position: relative;
+    }
+
+    #reader {
+      width: 300px;
+      margin: auto;
+    }
+
+    #popup {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      display: none;
+      font-size: 18px;
+      z-index: 1000;
+      transition: opacity 0.3s ease;
+    }
+
+    .ok {
+      background: rgba(0, 150, 0, 0.8);
+    }
+
+    .error {
+      background: rgba(200, 0, 0, 0.8);
+    }
+
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Сканируйте билет</h2>
+  <div id="reader"></div>
+  <p id="result"></p>
+  <div id="popup"></div>
+
+  <script>
+    let lastScanTime = 0;
+
+    function showPopup(message, isOk) {
+      const popup = document.getElementById("popup");
+      popup.textContent = message;
+      popup.className = isOk ? "ok" : "error";
+      popup.style.display = "block";
+      setTimeout(() => popup.style.display = "none", 2000);
+    }
+
+    function onScanSuccess(decodedText) {
+      const now = Date.now();
+      if (now - lastScanTime < 3000) return;
+      lastScanTime = now;
+
+      decodedText = decodedText.trim();
+      console.log("QR-код:", decodedText);
+
+      fetch(`/used?ticket_id=${decodedText}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log("Ответ JSON:", data);
+
+          // Обновляем текст под сканером
+          const result = document.getElementById("result");
+          result.textContent = data.message;
+          result.style.color = data.ok ? "green" : "red";
+
+          // Показываем всплывающее окно
+          showPopup(data.message, data.ok);
+        })
+        .catch(err => {
+          console.error("Ошибка запроса:", err);
+          showPopup("Ошибка при запросе", false);
+        });
+    }
+
+    function startScanner() {
+      const html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        onScanSuccess
+      );
+    }
+
+    startScanner();
+  </script>
+</body>
+</html>
