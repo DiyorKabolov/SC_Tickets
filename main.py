@@ -17,7 +17,7 @@ pdfmetrics.registerFont(TTFont('Arial', 'C:/Windows/Fonts/arial.ttf'))
 
 tamplate_path = r"C:\Users\krieg\OneDrive\Desktop\QR generator\SC_Tickets\ghb.pdf"
 
-output_dir = "C:\Users\krieg\OneDrive\Desktop\QR generator\SC_Tickets\Generated_tickets"
+output_dir = r"C:\Users\krieg\OneDrive\Desktop\QR generator\SC_Tickets\Generated_tickets"
 os.makedirs(output_dir, exist_ok=True)
 
 ticket_id = str(uuid.uuid4())
