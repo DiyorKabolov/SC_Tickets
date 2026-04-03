@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Подтверждение email — SC Tickets{% endblock %}
+
+{% block head %}
+<style>
+  .auth-wrap {
+    min-height: calc(100dvh - 56px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px 80px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .auth-wrap::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 60%, rgba(168,184,200,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 20%, rgba(168,184,200,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .auth-box {
+    width: 100%;
+    max-width: 400px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .auth-logo {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 6px;
+    color: var(--text);
+    letter-spacing: 0.04em;
+  }
+  .auth-logo span { color: var(--accent); }
+
+  .auth-sub {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 28px;
+  }
+
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+  }
+
+  .code-hint {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  .code-input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: 12px;
+    text-align: center;
+    padding: 14px;
+  }
+
+  .auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .auth-footer a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .auth-footer a:hover { text-decoration: underline; }
+
+  .page-footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(26,28,30,0.9);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    z-index: 10;
+  }
+  .footer-links { display: flex; gap: 20px; }
+  .footer-links a { color: var(--muted); text-decoration: none; }
+  .footer-links a:hover { color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div class="auth-logo">SC<span>·</span>TICKETS</div>
+    <div class="auth-sub">Подтверждение email</div>
+
+    <div class="auth-card">
+      <div class="code-hint">
+        Мы отправили 6-значный код на вашу почту.<br>
+        Введите его ниже чтобы завершить регистрацию.
+      </div>
+      <form method="post">
+        <div class="form-group" style="margin-bottom:24px">
+          <label class="form-label">Код подтверждения</label>
+          <input class="form-input code-input" type="text" name="code"
+                 placeholder="000000" maxlength="6"
+                 inputmode="numeric" autofocus required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">
+          Подтвердить
+        </button>
+      </form>
+    </div>
+
+    <div class="auth-footer">
+      Не пришло письмо?
+      <a href="{{ url_for('auth.register_page') }}">Зарегистрироваться заново</a>
+    </div>
+  </div>
+</div>
+
+<footer class="page-footer">
+  <span>© SC-TICKETS 2026</span>
+  <div class="footer-links">
+    <a href="#">Помощь</a>
+    <a href="#">О нас</a>
+  </div>
+</footer>
+{% endblock %}

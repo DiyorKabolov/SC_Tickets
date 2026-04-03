@@ -2,67 +2,287 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Сканер билетов</title>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 20px;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --border: #2a2a2a;
+      --text: #f0f0f0;
+      --muted: #666;
+      --ok: #22c55e;
+      --ok-bg: rgba(34, 197, 94, 0.12);
+      --err: #ef4444;
+      --err-bg: rgba(239, 68, 68, 0.12);
+      --accent: #f0f0f0;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Manrope', sans-serif;
+      overflow: hidden;
+    }
+
+    .layout {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: 100dvh;
+      padding: 24px 20px 32px;
+      gap: 16px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 8px var(--ok);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .header-text {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .counter {
+      margin-left: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .counter span {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Viewfinder */
+    .viewfinder-wrap {
       position: relative;
+      width: 100%;
+      max-width: 360px;
+      flex-shrink: 0;
     }
-
     #reader {
-      width: 300px;
-      margin: auto;
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #000;
+    }
+    /* Скрываем штатный UI html5-qrcode */
+    #reader img, #reader select { display: none !important; }
+    #reader video { border-radius: 12px; }
+
+    /* Уголки-прицел */
+    .corners {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .corners::before, .corners::after,
+    .corners span::before, .corners span::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border-color: var(--accent);
+      border-style: solid;
+      opacity: 0.9;
+    }
+    .corners::before  { top: 10px;  left: 10px;  border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
+    .corners::after   { top: 10px;  right: 10px; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
+    .corners span::before { bottom: 10px; left: 10px;  border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
+    .corners span::after  { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+
+    /* Линия сканирования */
+    .scan-line {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      height: 1.5px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: scan 2.4s ease-in-out infinite;
+      top: 14px;
+    }
+    @keyframes scan {
+      0%   { top: 14px; opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      100% { top: calc(100% - 14px); opacity: 0; }
     }
 
-    #popup {
+    /* Статус */
+    .status-card {
+      width: 100%;
+      max-width: 360px;
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      min-height: 72px;
+    }
+    .status-card.ok {
+      border-color: rgba(34, 197, 94, 0.4);
+      background: var(--ok-bg);
+    }
+    .status-card.err {
+      border-color: rgba(239, 68, 68, 0.4);
+      background: var(--err-bg);
+    }
+
+    .status-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 18px;
+      transition: background 0.3s;
+    }
+    .status-card.ok  .status-icon { background: rgba(34, 197, 94, 0.2); }
+    .status-card.err .status-icon { background: rgba(239, 68, 68, 0.2); }
+
+    .status-body { flex: 1; min-width: 0; }
+    .status-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .status-message {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 0.3s;
+    }
+    .status-card.ok  .status-message { color: var(--ok); }
+    .status-card.err .status-message { color: var(--err); }
+
+    /* Последний ID */
+    .last-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 4px;
+    }
+
+    /* Нижняя подпись */
+    .footer {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    /* Flash при скане */
+    @keyframes flash {
+      0%   { opacity: 0.15; }
+      100% { opacity: 0; }
+    }
+    .flash {
       position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 15px 25px;
-      border-radius: 10px;
-      display: none;
-      font-size: 18px;
-      z-index: 1000;
-      transition: opacity 0.3s ease;
+      inset: 0;
+      background: #fff;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 100;
     }
-
-    .ok {
-      background: rgba(0, 150, 0, 0.8);
-    }
-
-    .error {
-      background: rgba(200, 0, 0, 0.8);
-    }
-
-    #result {
-      margin-top: 20px;
-      font-size: 18px;
-      font-weight: bold;
-    }
+    .flash.ok-flash  { background: var(--ok); animation: flash 0.4s ease-out forwards; }
+    .flash.err-flash { background: var(--err); animation: flash 0.4s ease-out forwards; }
   </style>
 </head>
-
 <body>
-  <h2>Сканируйте билет</h2>
-  <div id="reader"></div>
-  <p id="result"></p>
-  <div id="popup"></div>
+  <div class="flash" id="flash"></div>
+
+  <div class="layout">
+    <div class="header">
+      <div class="dot"></div>
+      <span class="header-text">Сканер билетов</span>
+      <span class="counter">Отсканировано: <span id="count">0</span></span>
+    </div>
+
+    <div class="viewfinder-wrap">
+      <div id="reader"></div>
+      <div class="corners"><span></span></div>
+      <div class="scan-line"></div>
+    </div>
+
+    <div class="status-card" id="statusCard">
+      <div class="status-icon" id="statusIcon">🎫</div>
+      <div class="status-body">
+        <div class="status-label">Статус</div>
+        <div class="status-message" id="statusMessage">Наведите камеру на QR-код</div>
+        <div class="last-id" id="lastId"></div>
+      </div>
+    </div>
+
+    <div class="footer">SC Tickets · QR Scanner</div>
+  </div>
 
   <script>
     let lastScanTime = 0;
+    let scanCount = 0;
 
-    function showPopup(message, isOk) {
-      const popup = document.getElementById("popup");
-      popup.textContent = message;
-      popup.className = isOk ? "ok" : "error";
-      popup.style.display = "block";
-      setTimeout(() => popup.style.display = "none", 2000);
+    const flash       = document.getElementById("flash");
+    const statusCard  = document.getElementById("statusCard");
+    const statusIcon  = document.getElementById("statusIcon");
+    const statusMsg   = document.getElementById("statusMessage");
+    const lastIdEl    = document.getElementById("lastId");
+    const countEl     = document.getElementById("count");
+
+    function triggerFlash(ok) {
+      flash.className = "flash " + (ok ? "ok-flash" : "err-flash");
+      setTimeout(() => flash.className = "flash", 450);
+    }
+
+    function setStatus(message, isOk, ticketId) {
+      statusCard.className = "status-card " + (isOk ? "ok" : "err");
+      statusIcon.textContent = isOk ? "✅" : "❌";
+      statusMsg.textContent  = message;
+      if (ticketId) lastIdEl.textContent = ticketId;
+      triggerFlash(isOk);
+
+      if (navigator.vibrate) navigator.vibrate(isOk ? [40] : [60, 40, 60]);
     }
 
     function onScanSuccess(decodedText) {
@@ -71,34 +291,30 @@
       lastScanTime = now;
 
       decodedText = decodedText.trim();
-      console.log("QR-код:", decodedText);
 
-      fetch(`/used?ticket_id=${decodedText}`)
-        .then(response => response.json())
+      fetch(`/used?ticket_id=${encodeURIComponent(decodedText)}`)
+        .then(r => r.json())
         .then(data => {
-          console.log("Ответ JSON:", data);
-
-          // Обновляем текст под сканером
-          const result = document.getElementById("result");
-          result.textContent = data.message;
-          result.style.color = data.ok ? "green" : "red";
-
-          // Показываем всплывающее окно
-          showPopup(data.message, data.ok);
-        })
-        .catch(err => {
-          console.error("Ошибка запроса:", err);
-          showPopup("Ошибка при запросе", false);
-        });
+  if (data.ok) {        // ✅ только валидные билеты
+    scanCount++;
+    countEl.textContent = scanCount;
+  }
+  setStatus(data.message, data.ok, decodedText);
+})
+        .catch(() => setStatus("Ошибка соединения", false, null));
     }
 
     function startScanner() {
       const html5QrCode = new Html5Qrcode("reader");
       html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
         onScanSuccess
-      );
+      ).catch(() => {
+        statusMsg.textContent = "Нет доступа к камере";
+        statusCard.className  = "status-card err";
+        statusIcon.textContent = "📵";
+      });
     }
 
     startScanner();

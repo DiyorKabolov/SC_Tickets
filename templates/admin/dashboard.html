@@ -1,0 +1,68 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Дашборд — Admin{% endblock %}
+
+{% block admin_content %}
+<h1 class="page-title" style="margin-bottom:24px">Дашборд</h1>
+
+<!-- Статы -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:32px">
+  {% for label, value, color in [
+    ('Всего билетов', stats.total, 'var(--accent)'),
+    ('Использовано',  stats.used,  'var(--ok)'),
+    ('Свободных',     stats.unused,'var(--warn)'),
+    ('Пользователей', stats.users, 'var(--text)'),
+    ('Мероприятий',   stats.events,'var(--text)'),
+  ] %}
+    <div class="card" style="padding:16px">
+      <div style="font-size:26px;font-weight:600;font-family:'Unbounded',sans-serif;color:{{ color }};margin-bottom:4px">
+        {{ value }}
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">{{ label }}</div>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Мероприятия -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+  <h2 style="font-size:16px;font-weight:600">Мероприятия</h2>
+  <a href="{{ url_for('admin.event_create') }}" class="btn btn-ghost btn-sm">+ Создать</a>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th>Дата</th>
+          <th>Продано</th>
+          <th>Заполненность</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+          <tr>
+            <td style="font-weight:500">{{ event.title }}</td>
+            <td><span class="mono">{{ event.date }}</span></td>
+            <td><span class="mono">{{ event.sold }} / {{ event.capacity }}</span></td>
+            <td style="width:140px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+                  <div style="height:100%;width:{{ event.percent }}%;background:{% if event.percent > 90 %}var(--err){% elif event.percent > 70 %}var(--warn){% else %}var(--accent){% endif %};border-radius:2px"></div>
+                </div>
+                <span class="mono" style="font-size:10px">{{ event.percent }}%</span>
+              </div>
+            </td>
+            <td>
+              <a href="{{ url_for('admin.event_edit', event_id=event.id) }}" class="btn btn-ghost btn-sm">Ред.</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px">Мероприятий нет</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

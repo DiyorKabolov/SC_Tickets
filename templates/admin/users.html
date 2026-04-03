@@ -1,0 +1,59 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Пользователи — Admin{% endblock %}
+
+{% block admin_content %}
+<h1 class="page-title" style="margin-bottom:24px">Пользователи</h1>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Имя</th>
+          <th>Email</th>
+          <th>Роль</th>
+          <th>Дата</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+          <tr>
+            <td><span class="mono">{{ user.id }}</span></td>
+            <td style="font-weight:500">{{ user.username }}</td>
+            <td style="color:var(--muted)">{{ user.email }}</td>
+            <td>
+              {% if user.role == 'admin' %}
+                <span class="badge badge-warn">admin</span>
+              {% else %}
+                <span class="badge badge-dim">user</span>
+              {% endif %}
+            </td>
+            <td><span class="mono">{{ user.created_at[:10] }}</span></td>
+            <td>
+              {% if user.id != session.user_id %}
+                <div style="display:flex;gap:6px">
+                  <form action="{{ url_for('admin.toggle_admin', user_id=user.id) }}" method="post">
+                    <button type="submit" class="btn btn-ghost btn-sm">
+                      {% if user.role == 'admin' %}→ user{% else %}→ admin{% endif %}
+                    </button>
+                  </form>
+                  <form action="{{ url_for('admin.delete_user_route', user_id=user.id) }}" method="post"
+                        onsubmit="return confirm('Удалить {{ user.username }}?')">
+                    <button type="submit" class="btn btn-danger btn-sm">Удалить</button>
+                  </form>
+                </div>
+              {% else %}
+                <span style="font-size:11px;color:var(--muted2)">вы</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px">Пользователей нет</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

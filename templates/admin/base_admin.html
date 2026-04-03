@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+  .sidebar-link {
+    display: block;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s, background 0.15s;
+  }
+  .sidebar-link:hover { color: var(--text); background: var(--accent-dim); }
+  .sidebar-link.active { color: var(--text); background: var(--accent-dim); border: 1px solid var(--border2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:200px 1fr;min-height:calc(100dvh - 56px)">
+
+  <!-- Сайдбар -->
+  <aside style="background:var(--surface);border-right:1px solid var(--border);padding:20px 12px">
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:8px">
+      Управление
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <a href="{{ url_for('admin.dashboard') }}"
+         class="sidebar-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+        Дашборд
+      </a>
+      <a href="{{ url_for('admin.events_list') }}"
+         class="sidebar-link {% if 'event' in request.endpoint %}active{% endif %}">
+        Мероприятия
+      </a>
+      <a href="{{ url_for('admin.tickets_list') }}"
+         class="sidebar-link {% if request.endpoint == 'admin.tickets_list' %}active{% endif %}">
+        Билеты
+      </a>
+      <a href="{{ url_for('admin.users_list') }}"
+         class="sidebar-link {% if request.endpoint == 'admin.users_list' %}active{% endif %}">
+        Пользователи
+      </a>
+      <div style="height:1px;background:var(--border);margin:8px 0"></div>
+      <a href="{{ url_for('admin.scan') }}"
+         class="sidebar-link" style="color:var(--ok)">
+        Сканер
+      </a>
+    </div>
+  </aside>
+
+  <!-- Контент -->
+  <main style="padding:28px 32px;overflow-y:auto">
+    {% block admin_content %}{% endblock %}
+  </main>
+
+</div>
+{% endblock %}

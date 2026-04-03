@@ -1,0 +1,52 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Мероприятия — Admin{% endblock %}
+
+{% block admin_content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+  <h1 class="page-title" style="margin:0">Мероприятия</h1>
+  <a href="{{ url_for('admin.event_create') }}" class="btn btn-primary btn-sm">+ Создать</a>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th>Дата</th>
+          <th>Место</th>
+          <th>Продано</th>
+          <th>Свободно</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+          <tr>
+            <td style="font-weight:500">{{ event.title }}</td>
+            <td><span class="mono">{{ event.date }}</span></td>
+            <td style="color:var(--muted)">{{ event.location or '—' }}</td>
+            <td><span class="mono">{{ event.sold }}</span></td>
+            <td>
+              {% if event.available <= 0 %}
+                <span class="badge badge-err">Мест нет</span>
+              {% elif event.available < 10 %}
+                <span class="badge badge-warn">{{ event.available }}</span>
+              {% else %}
+                <span class="mono">{{ event.available }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('admin.event_edit', event_id=event.id) }}" class="btn btn-ghost btn-sm">
+                Редактировать
+              </a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px">Мероприятий нет</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

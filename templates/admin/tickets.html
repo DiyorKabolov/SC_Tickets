@@ -1,0 +1,51 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Билеты — Admin{% endblock %}
+
+{% block admin_content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+  <h1 class="page-title" style="margin:0">Все билеты</h1>
+  <span class="badge badge-dim">{{ tickets | length }} шт.</span>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticket ID</th>
+          <th>Пользователь</th>
+          <th>Мероприятие</th>
+          <th>Статус</th>
+          <th>Создан</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+          <tr>
+            <td><span class="mono">{{ ticket.ticket_id[:18] }}…</span></td>
+            <td>
+              {% if ticket.username %}
+                <span style="font-weight:500">{{ ticket.username }}</span>
+                <div style="font-size:11px;color:var(--muted)">{{ ticket.email }}</div>
+              {% else %}
+                <span style="color:var(--muted)">—</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--muted)">{{ ticket.event_title or '—' }}</td>
+            <td>
+              {% if ticket.used %}
+                <span class="badge badge-dim">Использован</span>
+              {% else %}
+                <span class="badge badge-ok">Активен</span>
+              {% endif %}
+            </td>
+            <td><span class="mono">{{ ticket.created_at[:10] }}</span></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:40px">Билетов нет</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

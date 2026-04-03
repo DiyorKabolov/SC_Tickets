@@ -1,0 +1,448 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{% if event %}Редактировать{% else %}Создать{% endif %} мероприятие — Admin{% endblock %}
+
+{% block head %}
+<style>
+  .form-wrap {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+    align-items: start;
+    max-width: 960px;
+  }
+
+  .color-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .color-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .color-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .color-field { display: flex; flex-direction: column; gap: 5px; }
+
+  .color-field label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .color-field-inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+  }
+
+  .color-field-inner input[type="color"] {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+    background: none;
+    flex-shrink: 0;
+  }
+
+  .color-field-inner input[type="text"] {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    width: 100%;
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .preset-btn {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    transition: opacity 0.15s;
+  }
+  .preset-btn:hover { opacity: 0.85; }
+
+  /* Превью карточки */
+  .preview-wrap {
+    position: sticky;
+    top: 76px;
+  }
+
+  .preview-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .preview-ticket {
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+    display: grid;
+    grid-template-columns: 1fr 110px;
+  }
+
+  .preview-left { padding: 18px 16px; }
+  .preview-stripe { height: 3px; }
+  .preview-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 10px;
+  }
+
+  .preview-qr {
+    width: 78px;
+    height: 78px;
+    border-radius: 6px;
+    border: 2px solid rgba(255,255,255,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preview-qr-inner {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    width: 50px;
+    height: 50px;
+    opacity: 0.4;
+  }
+
+  .preview-qr-cell {
+    border-radius: 1px;
+  }
+
+  .preview-right-label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: center;
+    opacity: 0.6;
+    color: #fff;
+  }
+
+  .preview-event-name {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-bottom: 10px;
+  }
+
+  .preview-detail {
+    font-size: 10px;
+    opacity: 0.6;
+    margin-bottom: 4px;
+  }
+
+  .preview-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7px;
+    opacity: 0.3;
+    margin: 8px 0;
+    word-break: break-all;
+  }
+
+  .preview-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 9px;
+    font-weight: 700;
+    background: rgba(34,197,94,0.15);
+    color: #16a34a;
+    border: 1px solid rgba(34,197,94,0.3);
+  }
+
+  @media (max-width: 700px) {
+    .form-wrap { grid-template-columns: 1fr; }
+    .preview-wrap { position: static; }
+  }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:28px">
+  <a href="{{ url_for('admin.events_list') }}" style="color:var(--muted);text-decoration:none;font-size:13px">← Назад</a>
+  <h1 class="page-title" style="margin:0">
+    {% if event %}Редактировать{% else %}Новое мероприятие{% endif %}
+  </h1>
+</div>
+
+<div class="form-wrap">
+
+  <!-- Левая часть — форма -->
+  <div class="card">
+    <form method="post" id="eventForm">
+      <div class="form-group">
+        <label class="form-label">Название *</label>
+        <input class="form-input" type="text" name="title" id="f-title"
+               value="{{ event.title if event else '' }}" required autofocus>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Описание</label>
+        <textarea class="form-input" name="description" rows="3">{{ event.description if event else '' }}</textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Дата *</label>
+          <input class="form-input" type="text" name="date" id="f-date"
+                 placeholder="01.01.2025 / 19:00"
+                 value="{{ event.date if event else '' }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Вместимость</label>
+          <input class="form-input" type="number" name="capacity" min="1"
+                 value="{{ event.capacity if event else 100 }}">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Место проведения</label>
+        <input class="form-input" type="text" name="location" id="f-location"
+               value="{{ event.location if event else '' }}"
+               placeholder="Город, название площадки">
+      </div>
+
+      <!-- Редактор цветов -->
+      <div class="color-section">
+        <div class="color-section-title">Оформление карточки</div>
+
+        <!-- Пресеты -->
+        <div class="presets" id="presets">
+          <button type="button" class="preset-btn"
+                  style="background:#2d2038"
+                  data-bg="#fdfdf5" data-accent="#a898e0" data-text="#2a2a2a">
+            Фиолетовый
+          </button>
+          <button type="button" class="preset-btn"
+                  style="background:#1a2e2a"
+                  data-bg="#f5fdf8" data-accent="#4ade80" data-text="#1a2a1a">
+            Изумрудный
+          </button>
+          <button type="button" class="preset-btn"
+                  style="background:#2a1a1a"
+                  data-bg="#fdf5f5" data-accent="#f87171" data-text="#2a1a1a">
+            Красный
+          </button>
+          <button type="button" class="preset-btn"
+                  style="background:#1a2030"
+                  data-bg="#f5f8fd" data-accent="#60a5fa" data-text="#1a2030">
+            Синий
+          </button>
+          <button type="button" class="preset-btn"
+                  style="background:#2a2010"
+                  data-bg="#fdfaf0" data-accent="#fbbf24" data-text="#2a2010">
+            Золотой
+          </button>
+          <button type="button" class="preset-btn"
+                  style="background:#282828"
+                  data-bg="#f8f8f8" data-accent="#888888" data-text="#1a1a1a">
+            Монохром
+          </button>
+        </div>
+
+        <div class="color-row">
+          <div class="color-field">
+            <label>Фон карточки</label>
+            <div class="color-field-inner">
+              <input type="color" id="cp-bg"
+                     value="{{ event.card_bg if event and event.card_bg else '#fdfdf5' }}">
+              <input type="text" id="ct-bg"
+                     value="{{ event.card_bg if event and event.card_bg else '#fdfdf5' }}"
+                     maxlength="7">
+            </div>
+            <input type="hidden" name="card_bg" id="f-card-bg"
+                   value="{{ event.card_bg if event and event.card_bg else '#fdfdf5' }}">
+          </div>
+
+          <div class="color-field">
+            <label>Акцент / правая панель</label>
+            <div class="color-field-inner">
+              <input type="color" id="cp-accent"
+                     value="{{ event.card_accent if event and event.card_accent else '#a898e0' }}">
+              <input type="text" id="ct-accent"
+                     value="{{ event.card_accent if event and event.card_accent else '#a898e0' }}"
+                     maxlength="7">
+            </div>
+            <input type="hidden" name="card_accent" id="f-card-accent"
+                   value="{{ event.card_accent if event and event.card_accent else '#a898e0' }}">
+          </div>
+
+          <div class="color-field">
+            <label>Текст</label>
+            <div class="color-field-inner">
+              <input type="color" id="cp-text"
+                     value="{{ event.card_text if event and event.card_text else '#2a2a2a' }}">
+              <input type="text" id="ct-text"
+                     value="{{ event.card_text if event and event.card_text else '#2a2a2a' }}"
+                     maxlength="7">
+            </div>
+            <input type="hidden" name="card_text" id="f-card-text"
+                   value="{{ event.card_text if event and event.card_text else '#2a2a2a' }}">
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="btn btn-primary">
+          {% if event %}Сохранить{% else %}Создать{% endif %}
+        </button>
+        <a href="{{ url_for('admin.events_list') }}" class="btn btn-ghost">Отмена</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Правая часть — превью -->
+  <div class="preview-wrap">
+    <div class="preview-label">Превью карточки</div>
+    <div class="preview-ticket" id="preview">
+      <!-- Левая часть -->
+      <div id="prev-left">
+        <div class="preview-stripe" id="prev-stripe"></div>
+        <div class="preview-left">
+          <div class="preview-event-name" id="prev-title">Название мероприятия</div>
+          <div class="preview-detail" id="prev-date">📅 Дата</div>
+          <div class="preview-detail" id="prev-loc">📍 Место</div>
+          <div class="preview-id">a1b2c3d4-e5f6-7890-abcd-ef1234567890</div>
+          <span class="preview-badge">✓ Действителен</span>
+        </div>
+      </div>
+      <!-- Правая часть -->
+      <div id="prev-right" class="preview-right">
+        <div class="preview-qr" id="prev-qr-wrap">
+          <div class="preview-qr-inner" id="prev-qr"></div>
+        </div>
+        <div class="preview-right-label">Покажите при входе</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Синхронизация color picker <-> text input
+  function syncColor(pickerId, textId, hiddenId) {
+    const picker = document.getElementById(pickerId);
+    const text   = document.getElementById(textId);
+    const hidden = document.getElementById(hiddenId);
+
+    picker.addEventListener('input', () => {
+      text.value   = picker.value;
+      hidden.value = picker.value;
+      updatePreview();
+    });
+
+    text.addEventListener('input', () => {
+      if (/^#[0-9a-fA-F]{6}$/.test(text.value)) {
+        picker.value = text.value;
+        hidden.value = text.value;
+        updatePreview();
+      }
+    });
+  }
+
+  syncColor('cp-bg',     'ct-bg',     'f-card-bg');
+  syncColor('cp-accent', 'ct-accent', 'f-card-accent');
+  syncColor('cp-text',   'ct-text',   'f-card-text');
+
+  // Пресеты
+  document.getElementById('presets').addEventListener('click', e => {
+    const btn = e.target.closest('.preset-btn');
+    if (!btn) return;
+    const bg     = btn.dataset.bg;
+    const accent = btn.dataset.accent;
+    const text   = btn.dataset.text;
+    ['bg', 'accent', 'text'].forEach((k, i) => {
+      const val = [bg, accent, text][i];
+      document.getElementById(`cp-${k}`).value  = val;
+      document.getElementById(`ct-${k}`).value  = val;
+      document.getElementById(`f-card-${k}`).value = val;
+    });
+    updatePreview();
+  });
+
+  // Обновление превью
+  function updatePreview() {
+    const bg     = document.getElementById('f-card-bg').value;
+    const accent = document.getElementById('f-card-accent').value;
+    const text   = document.getElementById('f-card-text').value;
+    const title  = document.getElementById('f-title').value || 'Название мероприятия';
+    const date   = document.getElementById('f-date').value   || 'Дата';
+    const loc    = document.getElementById('f-location').value || 'Место';
+
+    document.getElementById('prev-left').style.background  = bg;
+    document.getElementById('prev-right').style.background =
+      `linear-gradient(160deg, ${accent}cc, ${accent})`;
+    document.getElementById('prev-stripe').style.background =
+      `linear-gradient(90deg, ${accent}88, ${accent})`;
+    document.getElementById('prev-title').style.color = text;
+    document.getElementById('prev-date').style.color  = text + '99';
+    document.getElementById('prev-loc').style.color   = text + '99';
+    document.getElementById('prev-title').textContent = title;
+    document.getElementById('prev-date').textContent  = '📅 ' + date;
+    document.getElementById('prev-loc').textContent   = '📍 ' + loc;
+
+    // Имитация QR
+    const qr = document.getElementById('prev-qr');
+    qr.innerHTML = '';
+    const pattern = [1,0,1,1,0, 0,1,0,1,1, 1,1,1,0,1, 0,1,0,0,1, 1,0,1,1,0,
+                     1,0,0,1,0, 0,1,1,0,1, 1,0,1,0,0, 0,1,0,1,1, 1,1,0,0,1];
+    pattern.forEach(v => {
+      const cell = document.createElement('div');
+      cell.className = 'preview-qr-cell';
+      cell.style.background = v ? text : 'transparent';
+      cell.style.opacity = v ? '0.8' : '0';
+      qr.appendChild(cell);
+    });
+    document.getElementById('prev-qr-wrap').style.borderColor = text + '40';
+  }
+
+  // Слушаем изменения текстовых полей
+  ['f-title','f-date','f-location'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updatePreview);
+  });
+
+  // Первичная отрисовка
+  updatePreview();
+</script>
+{% endblock %}

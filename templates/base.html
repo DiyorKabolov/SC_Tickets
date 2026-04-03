@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}SC Tickets{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1c1e;
+      --surface: #22252a;
+      --surface2: #2a2e34;
+      --border: #32373f;
+      --border2: #42484f;
+      --text: #e8e6e0;
+      --muted: #7a7f88;
+      --muted2: #52575f;
+      --accent: #a8b8c8;
+      --accent-dim: rgba(168,184,200,0.08);
+      --ok: #4ade80;
+      --ok-bg: rgba(74,222,128,0.08);
+      --err: #f87171;
+      --err-bg: rgba(248,113,113,0.08);
+      --warn: #fbbf24;
+      --radius: 12px;
+      --radius-sm: 8px;
+
+      /* Цвета карточек билетов */
+      --card-bg: #fdfdf5;
+      --card-text: #2a2a2a;
+      --card-muted: #6a6a7a;
+      --card-accent: #a898e0;
+      --card-accent2: #c8c0f0;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Manrope', sans-serif;
+      min-height: 100dvh;
+      line-height: 1.6;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      height: 56px;
+      background: rgba(26,28,30,0.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: 'Unbounded', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      margin-right: auto;
+    }
+    .nav-logo span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .nav-link {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s, background 0.15s;
+    }
+    .nav-link:hover { color: var(--text); background: var(--accent-dim); }
+    .nav-link.active { color: var(--text); }
+
+    .nav-btn {
+      padding: 7px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(168,184,200,0.2);
+      text-decoration: none;
+      transition: background 0.15s;
+      cursor: pointer;
+      font-family: 'Manrope', sans-serif;
+    }
+    .nav-btn:hover { background: rgba(168,184,200,0.14); }
+
+    .nav-admin {
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--warn);
+      border: 1px solid rgba(251,191,36,0.2);
+      text-decoration: none;
+      margin-right: 4px;
+    }
+
+    /* ── Flash messages ── */
+    .flashes {
+      padding: 12px 24px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .flash {
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .flash.success { background: var(--ok-bg); color: var(--ok); border: 1px solid rgba(74,222,128,0.2); }
+    .flash.error   { background: var(--err-bg); color: var(--err); border: 1px solid rgba(248,113,113,0.2); }
+
+    /* ── Main layout ── */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    .page-title {
+      font-family: 'Unbounded', sans-serif;
+      font-size: clamp(22px, 5vw, 32px);
+      font-weight: 600;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
+
+    .page-sub {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'Manrope', sans-serif;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #1a1c1e;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+
+    .btn-ghost {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(168,184,200,0.2);
+    }
+    .btn-ghost:hover { background: rgba(168,184,200,0.14); }
+
+    .btn-danger {
+      background: var(--err-bg);
+      color: var(--err);
+      border: 1px solid rgba(248,113,113,0.2);
+    }
+
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn-full { width: 100%; }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 14px;
+      font-family: 'Manrope', sans-serif;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: var(--border2); }
+    .form-input::placeholder { color: var(--muted2); }
+    textarea.form-input { resize: vertical; min-height: 80px; }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .badge-ok   { background: var(--ok-bg); color: var(--ok); }
+    .badge-err  { background: var(--err-bg); color: var(--err); }
+    .badge-warn { background: rgba(251,191,36,0.1); color: var(--warn); }
+    .badge-dim  { background: var(--surface2); color: var(--muted); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--accent-dim); }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      nav { padding: 0 16px; }
+      .container { padding: 20px 16px; }
+      .nav-link { display: none; }
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav>
+    <a href="{{ url_for('events.index') }}" class="nav-logo">SC<span>·</span>TICKETS</a>
+    <div class="nav-links">
+      {% if session.get('role') == 'admin' %}
+        <a href="{{ url_for('admin.dashboard') }}" class="nav-admin">Admin</a>
+      {% endif %}
+      {% if session.get('user_id') %}
+        <a href="{{ url_for('events.index') }}" class="nav-link">Афиша</a>
+        <a href="{{ url_for('events.cabinet') }}" class="nav-link">Мои билеты</a>
+        <form action="{{ url_for('auth.logout') }}" method="post" style="display:inline">
+          <button type="submit" class="nav-btn">Выйти</button>
+        </form>
+      {% else %}
+        <a href="{{ url_for('events.index') }}" class="nav-link">Афиша</a>
+        <a href="{{ url_for('auth.login_page') }}" class="nav-link">Войти</a>
+        <a href="{{ url_for('auth.register_page') }}" class="nav-btn">Регистрация</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flashes">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</body>
+</html>
