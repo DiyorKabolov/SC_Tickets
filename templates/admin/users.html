@@ -34,13 +34,15 @@
             <td>
               {% if user.id != session.user_id %}
                 <div style="display:flex;gap:6px">
-                  <form action="{{ url_for('admin.toggle_admin', user_id=user.id) }}" method="post">
+                  <form action="{{ url_for('admin.toggle_admin', user_id=user.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-ghost btn-sm">
                       {% if user.role == 'admin' %}→ user{% else %}→ admin{% endif %}
                     </button>
                   </form>
-                  <form action="{{ url_for('admin.delete_user_route', user_id=user.id) }}" method="post"
+                  <form action="{{ url_for('admin.delete_user_route', user_id=user.id) }}" method="POST"
                         onsubmit="return confirm('Удалить {{ user.username }}?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-danger btn-sm">Удалить</button>
                   </form>
                 </div>

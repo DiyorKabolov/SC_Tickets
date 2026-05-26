@@ -99,7 +99,8 @@
     <div class="auth-sub">Создайте аккаунт — это бесплатно</div>
 
     <div class="auth-card">
-      <form method="post">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label class="form-label">Имя пользователя</label>
           <input class="form-input" type="text" name="username"

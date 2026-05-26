@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Мои билеты — SC Tickets{% endblock %}
 
 {% block head %}
@@ -214,15 +214,6 @@
     opacity: 0.5;
   }
 
-  .ticket-id-row {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    padding: 5px 8px;
-    border-radius: 6px;
-    word-break: break-all;
-    margin-bottom: 12px;
-  }
-
   .ticket-footer { display: flex; align-items: center; gap: 7px; }
 
   .ticket-badge-ok {
@@ -246,6 +237,17 @@
     font-weight: 600;
     background: rgba(0,0,0,0.06);
     color: rgba(0,0,0,0.4);
+  }
+
+  .ticket-badge-expired {
+    display: inline-flex;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(251,191,36,0.1);
+    color: #b45309;
+    border: 1px solid rgba(251,191,36,0.3);
   }
 
   .ticket-pdf-btn {
@@ -282,14 +284,6 @@
   .footer-links { display: flex; gap: 20px; }
   .footer-links a { color: var(--muted); text-decoration: none; transition: color 0.15s; }
   .footer-links a:hover { color: var(--text); }
-
-  @media (max-width: 600px) {
-    .ticket:not(.used) { grid-template-columns: 1fr; }
-    .ticket:not(.used) .ticket-right { height: 150px; flex-direction: row; justify-content: center; gap: 16px; }
-    .ticket:not(.used)::before, .ticket:not(.used)::after { display: none; }
-    .ticket.used { gap: 2px; }
-    .ticket.used .ticket-right { width: 120px; }
-  }
 </style>
 {% endblock %}
 
@@ -312,7 +306,7 @@
           {% set card_accent = ticket.card_accent or '#a898e0' %}
           {% set card_text   = ticket.card_text   or '#2a2a2a' %}
 
-          <div class="ticket {% if ticket.used %}used{% endif %}"
+          <div class="ticket {% if ticket.used %}used{% endif %}" data-ticket-id="{{ ticket.ticket_id }}"
                style="{% if not ticket.used %}background:{{ card_bg }}{% endif %}">
 
             <div class="ticket-left" style="background:{{ card_bg }}">
@@ -347,15 +341,13 @@
                   Получен {{ ticket.created_at[:10] }}
                 </div>
               </div>
-              <div class="ticket-id-row"
-                   style="color:{{ card_text }}40;background:{{ card_text }}08">
-                {{ ticket.ticket_id }}
-              </div>
               <div class="ticket-footer">
                 {% if ticket.used %}
-                  <span class="ticket-badge-used">Использован</span>
+                  <span class="ticket-status ticket-badge-used">Использован</span>
+                {% elif ticket.is_expired %}
+                  <span class="ticket-status ticket-badge-expired">Истёк</span>
                 {% else %}
-                  <span class="ticket-badge-ok">✓ Действителен</span>
+                  <span class="ticket-status ticket-badge-ok">✓ Действителен</span>
                 {% endif %}
                 <a href="{{ url_for('events.download_ticket', ticket_id=ticket.ticket_id) }}"
                    class="ticket-pdf-btn"
@@ -399,4 +391,52 @@
     </form>
   </div>
 </footer>
+
+<script>
+  (function () {
+    const statusUrl = "{{ url_for('events.cabinet_status') }}";
+
+    function statusClass(isUsed, isExpired) {
+      if (isUsed) return "ticket-status ticket-badge-used";
+      if (isExpired) return "ticket-status ticket-badge-expired";
+      return "ticket-status ticket-badge-ok";
+    }
+
+    function statusText(isUsed, isExpired) {
+      if (isUsed) return "???????????";
+      if (isExpired) return "?????";
+      return "? ????????????";
+    }
+
+    function applyTicketState(ticketEl, isUsed, isExpired) {
+      const badge = ticketEl.querySelector('.ticket-status');
+      if (!badge) return;
+
+      ticketEl.classList.toggle('used', !!isUsed);
+      badge.className = statusClass(!!isUsed, !!isExpired);
+      badge.textContent = statusText(!!isUsed, !!isExpired);
+    }
+
+    async function refreshTicketStates() {
+      try {
+        const response = await fetch(statusUrl, { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const tickets = data.tickets || [];
+        for (const t of tickets) {
+          const el = document.querySelector(`.ticket[data-ticket-id="${t.ticket_id}"]`);
+          if (!el) continue;
+          applyTicketState(el, t.used, t.is_expired);
+        }
+      } catch (_) {
+      }
+    }
+
+    refreshTicketStates();
+    setInterval(refreshTicketStates, 2000);
+  })();
+</script>
 {% endblock %}
+
+
+

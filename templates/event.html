@@ -301,7 +301,8 @@
               Мест нет
             </button>
           {% else %}
-            <form action="{{ url_for('events.buy_ticket', event_id=event.id) }}" method="post">
+            <form action="{{ url_for('events.buy_ticket', event_id=event.id) }}" method="POST">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn-ticket"
                       style="background:linear-gradient(135deg, {{ card_accent }}cc, {{ card_accent }});color:{{ card_text }}">
                 Получить билет

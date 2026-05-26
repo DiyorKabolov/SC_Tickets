@@ -77,6 +77,85 @@
       gap: 4px;
     }
 
+    .nav-menu-btn {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 3px;
+      width: 24px;
+      height: 24px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: var(--radius-sm);
+      transition: background 0.15s;
+    }
+    .nav-menu-btn:hover { background: var(--accent-dim); }
+    .nav-menu-btn span {
+      width: 16px;
+      height: 2px;
+      background: var(--muted);
+      transition: background 0.15s;
+    }
+    .nav-menu-btn:hover span { background: var(--text); }
+
+    .nav-dropdown {
+      display: none;
+      position: absolute;
+      top: 56px;
+      right: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 0;
+      min-width: 160px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      z-index: 100;
+    }
+    .nav-dropdown.show { display: block; }
+    .nav-dropdown a {
+      display: block;
+      width: 100%;
+      padding: 10px 16px;
+      color: var(--muted);
+      text-align: left;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+    .nav-dropdown a:hover {
+      color: var(--text);
+      background: var(--accent-dim);
+    }
+
+    .nav-dropdown .logout-button {
+      display: block;
+      width: calc(100% - 32px);
+      margin: 8px 16px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(248,113,113,0.6);
+      background: rgba(248,113,113,0.14);
+      color: #f87171;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .nav-dropdown .logout-button:hover {
+      background: rgba(248,113,113,0.24);
+      color: #fff;
+      border-color: rgba(248,113,113,0.9);
+    }
+
+    .nav-dropdown form { margin: 0; }
+
     .nav-link {
       padding: 6px 12px;
       border-radius: var(--radius-sm);
@@ -280,6 +359,7 @@
       nav { padding: 0 16px; }
       .container { padding: 20px 16px; }
       .nav-link { display: none; }
+      .nav-menu-btn { display: flex; }
     }
   </style>
   {% block head %}{% endblock %}
@@ -294,16 +374,33 @@
       {% if session.get('user_id') %}
         <a href="{{ url_for('events.index') }}" class="nav-link">Афиша</a>
         <a href="{{ url_for('events.cabinet') }}" class="nav-link">Мои билеты</a>
-        <form action="{{ url_for('auth.logout') }}" method="post" style="display:inline">
-          <button type="submit" class="nav-btn">Выйти</button>
-        </form>
       {% else %}
         <a href="{{ url_for('events.index') }}" class="nav-link">Афиша</a>
         <a href="{{ url_for('auth.login_page') }}" class="nav-link">Войти</a>
         <a href="{{ url_for('auth.register_page') }}" class="nav-btn">Регистрация</a>
       {% endif %}
-    </div>
-  </nav>
+    </div>    <button class="nav-menu-btn" onclick="toggleMenu()">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <div class="nav-dropdown" id="navDropdown">
+      {% if session.get('role') == 'admin' %}
+        <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+      {% endif %}
+      {% if session.get('user_id') %}
+        <a href="{{ url_for('events.index') }}">Афиша</a>
+        <a href="{{ url_for('events.cabinet') }}">Мои билеты</a>
+        <form action="{{ url_for('auth.logout') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="logout-button">Выйти</button>
+        </form>
+      {% else %}
+        <a href="{{ url_for('events.index') }}">Афиша</a>
+        <a href="{{ url_for('auth.login_page') }}">Войти</a>
+        <a href="{{ url_for('auth.register_page') }}">Регистрация</a>
+      {% endif %}
+    </div>  </nav>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
@@ -316,5 +413,21 @@
   {% endwith %}
 
   {% block content %}{% endblock %}
+
+  <script>
+    function toggleMenu() {
+      const dropdown = document.getElementById('navDropdown');
+      dropdown.classList.toggle('show');
+    }
+
+    // Закрыть меню при клике вне
+    document.addEventListener('click', function(event) {
+      const dropdown = document.getElementById('navDropdown');
+      const menuBtn = document.querySelector('.nav-menu-btn');
+      if (!dropdown.contains(event.target) && !menuBtn.contains(event.target)) {
+        dropdown.classList.remove('show');
+      }
+    });
+  </script>
 </body>
 </html>

@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+tickets.db
+Generated_tickets/
+qr_ticket.png
+.vscode/

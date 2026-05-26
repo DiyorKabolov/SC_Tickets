@@ -113,7 +113,8 @@
     <div class="auth-sub">Войдите чтобы получить билет</div>
 
     <div class="auth-card">
-      <form method="post">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label class="form-label">Email</label>
           <input class="form-input" type="email" name="email"

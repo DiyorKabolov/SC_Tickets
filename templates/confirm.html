@@ -118,7 +118,8 @@
         Мы отправили 6-значный код на вашу почту.<br>
         Введите его ниже чтобы завершить регистрацию.
       </div>
-      <form method="post">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group" style="margin-bottom:24px">
           <label class="form-label">Код подтверждения</label>
           <input class="form-input code-input" type="text" name="code"

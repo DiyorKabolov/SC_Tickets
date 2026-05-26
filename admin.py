@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from database import (
-    get_all_events, get_event_by_id, create_event, update_event,
+    get_all_events_with_stats, get_event_by_id, create_event, update_event,
     get_all_users, get_all_tickets, get_stats,
     get_event_tickets_count, delete_user
 )
@@ -14,12 +14,11 @@ admin = Blueprint("admin", __name__, url_prefix="/admin")
 @admin_required
 def dashboard():
     stats = get_stats()
-    events = get_all_events()
+    # Optimized: single query for all events and their ticket counts
+    events = get_all_events_with_stats()
 
     for event in events:
-        sold = get_event_tickets_count(event["id"])
-        event["sold"] = sold
-        event["percent"] = round(sold / event["capacity"] * 100) if event["capacity"] else 0
+        event["percent"] = round(event["sold"] / event["capacity"] * 100) if event["capacity"] else 0
 
     return render_template("admin/dashboard.html", stats=stats, events=events)
 
@@ -28,11 +27,9 @@ def dashboard():
 @admin.route("/events")
 @admin_required
 def events_list():
-    events = get_all_events()
+    events = get_all_events_with_stats()
     for event in events:
-        sold = get_event_tickets_count(event["id"])
-        event["sold"] = sold
-        event["available"] = event["capacity"] - sold
+        event["available"] = event["capacity"] - event["sold"]
     return render_template("admin/events.html", events=events)
 
 

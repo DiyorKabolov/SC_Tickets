@@ -1,22 +1,31 @@
-import sqlite3
-import hashlib
+﻿import sqlite3
+import bcrypt
 import os
+from datetime import datetime
+from contextlib import contextmanager
+from dotenv import load_dotenv
 
-DB_PATH = "tickets.db"
-print("DB path:", os.path.abspath(DB_PATH))
+load_dotenv()
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+db_path_from_env = os.getenv("DB_PATH")
+if db_path_from_env:
+    DB_PATH = db_path_from_env if os.path.isabs(db_path_from_env) else os.path.join(BASE_DIR, db_path_from_env)
+else:
+    DB_PATH = os.path.join(BASE_DIR, "tickets.db")
 
-def get_conn():
+@contextmanager
+def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
-
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 def init_db():
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
-
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +67,7 @@ def init_db():
             )
         """)
 
-        # Добавляем колонки если БД уже существует без них
+        # Add columns if DB exists without them
         for col, default in [
             ("card_bg", "'#fdfdf5'"),
             ("card_accent", "'#a898e0'"),
@@ -67,87 +76,61 @@ def init_db():
             try:
                 cursor.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT DEFAULT {default}")
             except sqlite3.OperationalError:
-                pass  # колонка уже есть
-
+                pass
         conn.commit()
-    finally:
-        conn.close()
 
-
-# ── Users ──────────────────────────────────────────
+# â”€â”€ Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def hash_password(password):
-    salt = os.urandom(16).hex()
-    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f"{salt}:{hashed}"
-
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def verify_password(password, stored_hash):
-    salt, hashed = stored_hash.split(":")
-    return hashlib.sha256((salt + password).encode()).hexdigest() == hashed
-
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+    except Exception:
+        return False
 
 def create_user(username, email, password, role="user"):
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
-            (username, email, hash_password(password), role)
-        )
-        conn.commit()
-        return cursor.lastrowid
-    except sqlite3.IntegrityError:
-        return None
-    finally:
-        conn.close()
-
+    with get_db() as conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
+                (username, email, hash_password(password), role)
+            )
+            conn.commit()
+            return cursor.lastrowid
+        except sqlite3.IntegrityError:
+            return None
 
 def get_user_by_email(email):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
         row = cursor.fetchone()
         return dict(row) if row else None
-    finally:
-        conn.close()
-
 
 def get_user_by_id(user_id):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
-    finally:
-        conn.close()
-
 
 def get_all_users():
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC")
         return [dict(row) for row in cursor.fetchall()]
-    finally:
-        conn.close()
-
 
 def set_verify_token(user_id, token):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET verify_token=? WHERE id=?", (token, user_id))
         conn.commit()
-    finally:
-        conn.close()
-
 
 def verify_email_token(user_id, code):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT verify_token FROM users WHERE id=?", (user_id,))
         row = cursor.fetchone()
@@ -156,16 +139,12 @@ def verify_email_token(user_id, code):
         cursor.execute("UPDATE users SET is_verified=1, verify_token=NULL WHERE id=?", (user_id,))
         conn.commit()
         return True
-    finally:
-        conn.close()
 
-
-# ── Events ─────────────────────────────────────────
+# â”€â”€ Events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def create_event(title, description, date, location, capacity,
                  card_bg="#fdfdf5", card_accent="#a898e0", card_text="#2a2a2a"):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO events (title, description, date, location, capacity,
@@ -175,45 +154,36 @@ def create_event(title, description, date, location, capacity,
               card_bg, card_accent, card_text))
         conn.commit()
         return cursor.lastrowid
-    finally:
-        conn.close()
 
-
-def get_all_events():
-    conn = get_conn()
-    try:
+def get_all_events_with_stats():
+    """Optimized: returns events with ticket counts in one query (Fixes N+1)"""
+    with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM events ORDER BY date ASC")
+        cursor.execute("""
+            SELECT e.*, COUNT(t.id) as sold
+            FROM events e
+            LEFT JOIN tickets t ON e.id = t.event_id
+            GROUP BY e.id
+            ORDER BY e.date ASC
+        """)
         return [dict(row) for row in cursor.fetchall()]
-    finally:
-        conn.close()
-
 
 def get_event_by_id(event_id):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM events WHERE id = ?", (event_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
-    finally:
-        conn.close()
-
 
 def get_event_tickets_count(event_id):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM tickets WHERE event_id = ?", (event_id,))
         return cursor.fetchone()[0]
-    finally:
-        conn.close()
-
 
 def update_event(event_id, title, description, date, location, capacity,
                  card_bg="#fdfdf5", card_accent="#a898e0", card_text="#2a2a2a"):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE events
@@ -223,28 +193,42 @@ def update_event(event_id, title, description, date, location, capacity,
         """, (title, description, date, location, capacity,
               card_bg, card_accent, card_text, event_id))
         conn.commit()
-    finally:
-        conn.close()
 
-
-# ── Tickets ────────────────────────────────────────
+# â”€â”€ Tickets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def save_ticket(ticket_id, user_id=None, event_id=None):
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR IGNORE INTO tickets (ticket_id, user_id, event_id) VALUES (?, ?, ?)",
-            (ticket_id, user_id, event_id)
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            cursor = conn.cursor()
+            # BEGIN IMMEDIATE locks the DB to prevent race conditions
+            cursor.execute("BEGIN IMMEDIATE")
+
+            cursor.execute("SELECT capacity FROM events WHERE id = ?", (event_id,))
+            event = cursor.fetchone()
+            if not event:
+                conn.rollback()
+                return False
+
+            cursor.execute("SELECT COUNT(*) FROM tickets WHERE event_id = ?", (event_id,))
+            sold = cursor.fetchone()[0]
+
+            if sold >= event['capacity']:
+                conn.rollback()
+                return False
+
+            cursor.execute(
+                "INSERT OR IGNORE INTO tickets (ticket_id, user_id, event_id) VALUES (?, ?, ?)",
+                (ticket_id, user_id, event_id)
+            )
+            conn.commit()
+            return True
+        except Exception:
+            conn.rollback()
+            return False
 
 
 def get_user_tickets(user_id):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT t.*, e.title as event_title, e.date as event_date,
@@ -256,13 +240,9 @@ def get_user_tickets(user_id):
             ORDER BY t.created_at DESC
         """, (user_id,))
         return [dict(row) for row in cursor.fetchall()]
-    finally:
-        conn.close()
-
 
 def get_all_tickets():
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT t.*, u.username, u.email, e.title as event_title
@@ -272,34 +252,44 @@ def get_all_tickets():
             ORDER BY t.created_at DESC
         """)
         return [dict(row) for row in cursor.fetchall()]
-    finally:
-        conn.close()
-
 
 def check_ticket(ticket_id):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT used FROM tickets WHERE ticket_id = ?", (ticket_id,))
+        cursor.execute("""
+            SELECT t.used, e.date AS event_date
+            FROM tickets t
+            LEFT JOIN events e ON t.event_id = e.id
+            WHERE t.ticket_id = ?
+        """, (ticket_id,))
         result = cursor.fetchone()
 
         if result is None:
-            return {"ok": False, "message": "Билет не найден"}
+            return {"ok": False, "message": "\u0411\u0438\u043b\u0435\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d"}
         if result[0] == 1:
-            return {"ok": False, "message": "Билет уже использован"}
+            return {"ok": False, "message": "\u0411\u0438\u043b\u0435\u0442 \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d"}
+
+        event_date = (result["event_date"] or "").strip()
+        if event_date:
+            now = datetime.now()
+            parsed_dt = None
+            for fmt in ("%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", "%d.%m.%Y", "%Y-%m-%d"):
+                try:
+                    parsed_dt = datetime.strptime(event_date, fmt)
+                    break
+                except ValueError:
+                    continue
+            if parsed_dt and parsed_dt < now:
+                return {"ok": False, "message": "\u0411\u0438\u043b\u0435\u0442 \u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d"}
 
         cursor.execute("UPDATE tickets SET used = 1 WHERE ticket_id = ?", (ticket_id,))
         conn.commit()
-        return {"ok": True, "message": "Билет действителен"}
-    finally:
-        conn.close()
+        return {"ok": True, "message": "\u0411\u0438\u043b\u0435\u0442 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u0435\u043d"}
 
-
-# ── Admin stats ────────────────────────────────────
+# â”€â”€ Admin stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def get_stats():
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM users")
         users_count = cursor.fetchone()[0]
@@ -315,19 +305,12 @@ def get_stats():
             "tickets": tickets_count,
             "scanned": scanned_count,
         }
-    finally:
-        conn.close()
-
 
 def set_user_role(user_id, role):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET role=? WHERE id=?", (role, user_id))
         conn.commit()
-    finally:
-        conn.close()
-
 
 def verify_user(email, password):
     user = get_user_by_email(email)
@@ -335,13 +318,12 @@ def verify_user(email, password):
         return user
     return None
 
-
 def delete_user(user_id):
-    conn = get_conn()
-    try:
+    with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE tickets SET user_id=NULL WHERE user_id=?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id=?", (user_id,))
         conn.commit()
-    finally:
-        conn.close()
+
+
+

@@ -211,6 +211,7 @@
   <!-- Левая часть — форма -->
   <div class="card">
     <form method="post" id="eventForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-group">
         <label class="form-label">Название *</label>
         <input class="form-input" type="text" name="title" id="f-title"

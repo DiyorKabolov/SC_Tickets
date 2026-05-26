@@ -2,28 +2,42 @@ import uuid
 import qrcode
 import io
 import base64
-from flask import Blueprint, render_template, redirect, url_for, flash, session, send_file
+import os
+from datetime import datetime
+from flask import Blueprint, render_template, redirect, url_for, flash, session, send_file, jsonify
 from database import (
-    get_all_events, get_event_by_id,
-    get_event_tickets_count, save_ticket, get_user_tickets
+    get_all_events_with_stats, get_event_by_id,
+    save_ticket, get_user_tickets
 )
 from auth import login_required
-from main import generate_ticket
+from main import generate_ticket, OUTPUT_DIR
 
 events = Blueprint("events", __name__)
+
+
+def _is_ticket_expired(event_date_raw):
+    if not event_date_raw:
+        return False
+    now = datetime.now()
+    for fmt in ("%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", "%d.%m.%Y", "%Y-%m-%d"):
+        try:
+            event_dt = datetime.strptime(event_date_raw.strip(), fmt)
+            return event_dt < now
+        except ValueError:
+            continue
+    return False
 
 # ───────────────────────── афиша ───────────────────────────────────
 
 @events.route("/")
 def index():
-    all_events = get_all_events()
+    # Fixes N+1: Single query for all events and counts
+    all_events = get_all_events_with_stats()
 
     for event in all_events:
-        sold = get_event_tickets_count(event["id"])
-        event["sold"] = sold
-        event["available"] = event["capacity"] - sold
+        event["available"] = event["capacity"] - event["sold"]
         event["is_full"] = event["available"] <= 0
-        event["percent"] = round(sold / event["capacity"] * 100) if event["capacity"] else 0
+        event["percent"] = round(event["sold"] / event["capacity"] * 100) if event["capacity"] else 0
 
     return render_template("index.html", events=all_events)
 
@@ -36,6 +50,8 @@ def event_page(event_id):
         flash("Мероприятие не найдено", "error")
         return redirect(url_for("events.index"))
 
+    # Stats for the specific event
+    from database import get_event_tickets_count
     sold = get_event_tickets_count(event_id)
     event["sold"] = sold
     event["available"] = event["capacity"] - sold
@@ -60,18 +76,18 @@ def buy_ticket(event_id):
         flash("Мероприятие не найдено", "error")
         return redirect(url_for("events.index"))
 
-    sold = get_event_tickets_count(event_id)
-    if sold >= event["capacity"]:
-        flash("Билеты закончились", "error")
-        return redirect(url_for("events.event_page", event_id=event_id))
-
     user_tickets = get_user_tickets(session["user_id"])
     if any(t["event_id"] == event_id for t in user_tickets):
         flash("У вас уже есть билет на это мероприятие", "error")
         return redirect(url_for("events.event_page", event_id=event_id))
 
     ticket_id = str(uuid.uuid4())
-    save_ticket(ticket_id, user_id=session["user_id"], event_id=event_id)
+    # Database handles capacity and race conditions in save_ticket
+    success = save_ticket(ticket_id, user_id=session["user_id"], event_id=event_id)
+
+    if not success:
+        flash("К сожалению, билеты закончились", "error")
+        return redirect(url_for("events.event_page", event_id=event_id))
 
     try:
         generate_ticket(ticket_id=ticket_id, event=event)
@@ -90,12 +106,30 @@ def cabinet():
     tickets = get_user_tickets(session["user_id"])
 
     for ticket in tickets:
+        # Generate QR code for display
         qr = qrcode.make(ticket["ticket_id"])
         buffer = io.BytesIO()
         qr.save(buffer, format="PNG")
         ticket["qr_base64"] = base64.b64encode(buffer.getvalue()).decode()
 
+        # Date Parsing and Expiration check
+        ticket["is_expired"] = _is_ticket_expired(ticket.get("event_date"))
+
     return render_template("cabinet.html", tickets=tickets)
+
+
+@events.route("/cabinet/status")
+@login_required
+def cabinet_status():
+    tickets = get_user_tickets(session["user_id"])
+    payload = []
+    for ticket in tickets:
+        payload.append({
+            "ticket_id": ticket["ticket_id"],
+            "used": bool(ticket["used"]),
+            "is_expired": _is_ticket_expired(ticket.get("event_date")),
+        })
+    return jsonify({"tickets": payload})
 
 # ───────────────────────── скачать PDF ─────────────────────────────
 
@@ -109,6 +143,7 @@ def download_ticket(ticket_id):
         flash("Билет не найден", "error")
         return redirect(url_for("events.cabinet"))
 
+    # Caching check in generate_ticket automatically handles existence
     event = get_event_by_id(ticket["event_id"]) if ticket["event_id"] else None
     pdf_path = generate_ticket(ticket_id=ticket_id, event=event)
 

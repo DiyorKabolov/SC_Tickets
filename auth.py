@@ -3,6 +3,7 @@ from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from database import create_user, verify_user, get_user_by_id, set_verify_token, verify_email_token, get_user_by_email
 from mail import send_verify_email
+from urllib.parse import urlparse
 
 # ───────────────────────── декораторы ──────────────────────────────
 
@@ -28,6 +29,18 @@ def admin_required(f):
     return decorated
 
 # ───────────────────────── вспомогательные ─────────────────────────
+
+def is_safe_url(target):
+    if not target:
+        return False
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(target)
+    # Relative paths (no netloc, no scheme) are safe
+    # Absolute URLs are safe only if they point to the same host
+    if not test_url.netloc and not test_url.scheme:
+        return True
+    return test_url.scheme in ('http', 'https') and \
+           ref_url.netloc == test_url.netloc
 
 def current_user():
     user_id = session.get("user_id")
@@ -73,15 +86,12 @@ def register_page():
             user_id = create_user(username, email, password)
 
             if user_id is None:
-                # Email или имя уже заняты — проверяем не подтверждён ли аккаунт
                 existing = get_user_by_email(email)
                 if existing and existing["is_verified"] == 0:
-                    # Аккаунт есть но не подтверждён — отправляем новый код
                     try:
                         _send_code(existing["id"], email, existing["username"])
                         flash("Аккаунт уже существует но не подтверждён — отправили новый код", "success")
                     except Exception as e:
-                        print(f"Ошибка отправки: {e}")
                         flash("Не удалось отправить письмо", "error")
                     session["pending_user_id"] = existing["id"]
                     return redirect(url_for("auth.confirm_page"))
@@ -90,9 +100,8 @@ def register_page():
             else:
                 try:
                     _send_code(user_id, email, username)
-                    flash("Код отправлен на почту", "success")
+                    flash("Код подтверждения отправлен на почту", "success")
                 except Exception as e:
-                    print(f"Ошибка отправки: {e}")
                     flash("Аккаунт создан, но письмо не отправилось", "error")
                 session["pending_user_id"] = user_id
                 return redirect(url_for("auth.confirm_page"))
@@ -132,18 +141,19 @@ def login_page():
         if user is None:
             flash("Неверный email или пароль", "error")
         elif user["is_verified"] == 0:
-            # Даём возможность сразу перейти к подтверждению
             session["pending_user_id"] = user["id"]
-            flash("Подтвердите email — отправляем новый код", "error")
+            flash("Подтвердите email — отправили новый код", "error")
             try:
                 _send_code(user["id"], user["email"], user["username"])
             except Exception as e:
-                print(f"Ошибка отправки: {e}")
+                print(f"Error: {e}")
             return redirect(url_for("auth.confirm_page"))
         else:
             _save_session(user)
-            next_url = request.args.get("next") or url_for("events.index")
-            return redirect(next_url)
+            next_url = request.args.get("next")
+            if next_url and not is_safe_url(next_url):
+                next_url = url_for("events.index")
+            return redirect(next_url or url_for("events.index"))
 
     return render_template("login.html")
 
