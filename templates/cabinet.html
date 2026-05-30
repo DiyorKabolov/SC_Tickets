@@ -135,30 +135,36 @@
     opacity: 0.85;
   }
 
-  /* Add an irregular SVG strip along the split line to simulate a torn paper edge.
-     Using a data-URI SVG repeated vertically gives a natural, non-uniform look. */
-  .ticket.used::before {
+  /* Replace heavy SVG strip with subtle highlight + shadow so QR isn't obscured */
+  .ticket.used::before,
+  .ticket.used::after { content: none; }
+
+  /* thin bright edge on the left piece (paper fibers) */
+  .ticket.used .ticket-left::after {
     content: '';
     position: absolute;
-    /* position the strip slightly inset so it doesn't darken the right half */
-    left: calc(100% - 150px - 18px);
-    top: 0;
-    bottom: 0;
-    width: 18px;
+    right: -6px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: linear-gradient(to right, rgba(255,255,255,0.95), rgba(255,255,255,0.2));
+    border-radius: 1px;
     pointer-events: none;
-    background-repeat: repeat-y;
-    background-size: 18px 56px;
-    /* lighter, semi-transparent SVG so it reads as torn paper, not a dark block */
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 56' preserveAspectRatio='none'>
-      <rect width='18' height='56' fill='transparent'/>
-      <path d='M18 0 L12 8 L18 16 L12 24 L18 32 L12 40 L18 48 L12 56 L0 56 L0 0 Z' fill='%23ffffff' fill-opacity='0.12'/>
-    </svg>");
-    opacity: 0.95; /* keep SVG fill-opacity control; overall element nearly opaque so translucency comes from SVG */
-    mix-blend-mode: normal;
-    z-index: 1;
+    z-index: 3;
   }
 
-  .ticket.used::after { content: none; }
+  /* faint shadow on the right piece to suggest separation */
+  .ticket.used .ticket-right::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 6px;
+    bottom: 6px;
+    width: 6px;
+    background: linear-gradient(to left, rgba(0,0,0,0.08), rgba(0,0,0,0));
+    pointer-events: none;
+    z-index: 2;
+  }
 
   .ticket.used .ticket-left {
     flex: 1;
