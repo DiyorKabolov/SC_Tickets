@@ -70,8 +70,16 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.4);
   }
 
-  .ticket::before,
-  .ticket::after {
+  /* Decorative semicircles on the ticket tear line.
+     Instead of full circles centered on the container, we render
+     half-circles on each side (.ticket-left and .ticket-right).
+     This preserves the geometry when the ticket is split/rotated. */
+  .ticket-left, .ticket-right { position: relative; }
+
+  .ticket-left::before,
+  .ticket-left::after,
+  .ticket-right::before,
+  .ticket-right::after {
     content: '';
     position: absolute;
     width: 18px;
@@ -79,10 +87,16 @@
     background: var(--bg);
     border-radius: 50%;
     z-index: 2;
-    left: calc(100% - 150px - 9px);
+    pointer-events: none;
   }
-  .ticket::before { top: -9px; }
-  .ticket::after  { bottom: -9px; }
+
+  /* Left side: draw the right-half (positioned outwards so only left half shows) */
+  .ticket-left::before { right: -9px; top: -9px; }
+  .ticket-left::after  { right: -9px; bottom: -9px; }
+
+  /* Right side: draw the left-half (positioned outwards so only right half shows) */
+  .ticket-right::before { left: -9px; top: -9px; }
+  .ticket-right::after  { left: -9px; bottom: -9px; }
 
   .ticket-left {
     min-width: 0;
@@ -111,8 +125,7 @@
     opacity: 0.85;
   }
 
-  .ticket.used::before,
-  .ticket.used::after { display: none; }
+  /* keep per-side semicircles visible on torn pieces */
 
   .ticket.used .ticket-left {
     flex: 1;
@@ -124,19 +137,19 @@
     /* Рваный правый край */
     clip-path: polygon(
       0 0, 100% 0,
-      calc(100% - 7px) 4%, 100% 8%,
-      calc(100% - 7px) 12%, 100% 16%,
-      calc(100% - 7px) 20%, 100% 24%,
-      calc(100% - 7px) 28%, 100% 32%,
-      calc(100% - 7px) 36%, 100% 40%,
-      calc(100% - 7px) 44%, 100% 48%,
-      calc(100% - 7px) 52%, 100% 56%,
-      calc(100% - 7px) 60%, 100% 64%,
-      calc(100% - 7px) 68%, 100% 72%,
-      calc(100% - 7px) 76%, 100% 80%,
-      calc(100% - 7px) 84%, 100% 88%,
-      calc(100% - 7px) 92%, 100% 96%,
-      calc(100% - 7px) 100%, 0 100%
+      calc(100% - 9px) 4%, 100% 8%,
+      calc(100% - 9px) 12%, 100% 16%,
+      calc(100% - 9px) 20%, 100% 24%,
+      calc(100% - 9px) 28%, 100% 32%,
+      calc(100% - 9px) 36%, 100% 40%,
+      calc(100% - 9px) 44%, 100% 48%,
+      calc(100% - 9px) 52%, 100% 56%,
+      calc(100% - 9px) 60%, 100% 64%,
+      calc(100% - 9px) 68%, 100% 72%,
+      calc(100% - 9px) 76%, 100% 80%,
+      calc(100% - 9px) 84%, 100% 88%,
+      calc(100% - 9px) 92%, 100% 96%,
+      calc(100% - 9px) 100%, 0 100%
     );
   }
 
@@ -149,19 +162,19 @@
     transform-origin: center left;
     /* Рваный левый край */
     clip-path: polygon(
-      7px 0, 100% 0, 100% 100%, 7px 100%,
-      0 96%, 7px 92%,
-      0 88%, 7px 84%,
-      0 80%, 7px 76%,
-      0 72%, 7px 68%,
-      0 64%, 7px 60%,
-      0 56%, 7px 52%,
-      0 48%, 7px 44%,
-      0 40%, 7px 36%,
-      0 32%, 7px 28%,
-      0 24%, 7px 20%,
-      0 16%, 7px 12%,
-      0 8%, 7px 4%, 0 0
+      9px 0, 100% 0, 100% 100%, 9px 100%,
+      0 96%, 9px 92%,
+      0 88%, 9px 84%,
+      0 80%, 9px 76%,
+      0 72%, 9px 68%,
+      0 64%, 9px 60%,
+      0 56%, 9px 52%,
+      0 48%, 9px 44%,
+      0 40%, 9px 36%,
+      0 32%, 9px 28%,
+      0 24%, 9px 20%,
+      0 16%, 9px 12%,
+      0 8%, 9px 4%, 0 0
     );
   }
 
