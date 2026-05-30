@@ -135,8 +135,29 @@
     opacity: 0.85;
   }
 
-  .ticket.used::before,
-  .ticket.used::after { display: none; }
+  /* Add an irregular SVG strip along the split line to simulate a torn paper edge.
+     Using a data-URI SVG repeated vertically gives a natural, non-uniform look. */
+  .ticket.used::before {
+    content: '';
+    position: absolute;
+    /* position the strip over the inner edge between left and right pieces */
+    left: calc(100% - 150px - 30px);
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    pointer-events: none;
+    background-repeat: repeat-y;
+    background-size: 30px 56px;
+    /* data-uri SVG: zig-zag teeth repeated vertically; color chosen to match dark UI */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 56' preserveAspectRatio='none'>
+      <rect width='30' height='56' fill='transparent'/>
+      <path d='M30 0 L20 8 L30 16 L20 24 L30 32 L20 40 L30 48 L20 56 L0 56 L0 0 Z' fill='%231a1c1e' />
+    </svg>");
+    opacity: 0.12;
+    mix-blend-mode: multiply;
+  }
+
+  .ticket.used::after { content: none; }
 
   .ticket.used .ticket-left {
     flex: 1;
