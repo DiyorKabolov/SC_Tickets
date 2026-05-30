@@ -37,9 +37,16 @@
               {% endif %}
             </td>
             <td>
-              <a href="{{ url_for('admin.event_edit', event_id=event.id) }}" class="btn btn-ghost btn-sm">
-                Редактировать
-              </a>
+              <div style="display:flex;gap:6px;justify-content:flex-end">
+                <a href="{{ url_for('admin.event_edit', event_id=event.id) }}" class="btn btn-ghost btn-sm">
+                  Редактировать
+                </a>
+                <form action="{{ url_for('admin.event_delete', event_id=event.id) }}" method="POST"
+                      onsubmit='return confirm({{ ("Удалить мероприятие «" ~ event.title ~ "» и все его билеты?")|tojson }})'>
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-danger btn-sm">Удалить</button>
+                </form>
+              </div>
             </td>
           </tr>
         {% else %}

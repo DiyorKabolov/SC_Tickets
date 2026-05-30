@@ -374,6 +374,7 @@
       {% if session.get('user_id') %}
         <a href="{{ url_for('events.index') }}" class="nav-link">Афиша</a>
         <a href="{{ url_for('events.cabinet') }}" class="nav-link">Мои билеты</a>
+        <a href="{{ url_for('events.profile') }}" class="nav-link">Личный кабинет</a>
       {% else %}
         <a href="{{ url_for('events.index') }}" class="nav-link">Афиша</a>
         <a href="{{ url_for('auth.login_page') }}" class="nav-link">Войти</a>
@@ -391,10 +392,7 @@
       {% if session.get('user_id') %}
         <a href="{{ url_for('events.index') }}">Афиша</a>
         <a href="{{ url_for('events.cabinet') }}">Мои билеты</a>
-        <form action="{{ url_for('auth.logout') }}" method="POST">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="logout-button">Выйти</button>
-        </form>
+        <a href="{{ url_for('events.profile') }}">Личный кабинет</a>
       {% else %}
         <a href="{{ url_for('events.index') }}">Афиша</a>
         <a href="{{ url_for('auth.login_page') }}">Войти</a>

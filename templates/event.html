@@ -289,13 +289,6 @@
                style="background:linear-gradient(135deg, {{ card_accent }}cc, {{ card_accent }});color:{{ card_text }}">
               Войти для получения
             </a>
-          {% elif user_has_ticket %}
-            <div class="ticket-has-badge">✓ Билет уже получен</div>
-            <a href="{{ url_for('events.cabinet') }}"
-               class="btn-ticket btn-ticket-ghost"
-               style="color:{{ card_text }}88">
-              Мои билеты →
-            </a>
           {% elif event.is_full %}
             <button class="btn-ticket btn-ticket-disabled" disabled>
               Мест нет

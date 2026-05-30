@@ -65,7 +65,7 @@
     border-radius: 16px;
     overflow: hidden;
     display: grid;
-    grid-template-columns: 1fr 150px;
+    grid-template-columns: minmax(0, 1fr) 150px;
     position: relative;
     box-shadow: 0 20px 60px rgba(0,0,0,0.4);
   }
@@ -85,6 +85,7 @@
   .ticket::after  { bottom: -9px; }
 
   .ticket-left {
+    min-width: 0;
     padding: 24px 20px 20px;
     border-right: 2px dashed rgba(0,0,0,0.1);
   }
@@ -189,6 +190,8 @@
     font-weight: 600;
     line-height: 1.25;
     margin-bottom: 14px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .ticket-details {
@@ -384,11 +387,6 @@
   <div class="footer-links">
     <a href="#">Помощь</a>
     <a href="#">О нас</a>
-    <form action="{{ url_for('auth.logout') }}" method="post" style="display:inline">
-      <button type="submit" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0;font-family:'Manrope',sans-serif">
-        Выйти
-      </button>
-    </form>
   </div>
 </footer>
 
@@ -403,9 +401,9 @@
     }
 
     function statusText(isUsed, isExpired) {
-      if (isUsed) return "???????????";
-      if (isExpired) return "?????";
-      return "? ????????????";
+      if (isUsed) return "Использован";
+      if (isExpired) return "Истёк";
+      return "✓ Действителен";
     }
 
     function applyTicketState(ticketEl, isUsed, isExpired) {

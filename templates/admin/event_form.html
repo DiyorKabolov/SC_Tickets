@@ -2,6 +2,7 @@
 {% block title %}{% if event %}Редактировать{% else %}Создать{% endif %} мероприятие — Admin{% endblock %}
 
 {% block head %}
+{{ super() }}
 <style>
   .form-wrap {
     display: grid;
@@ -227,7 +228,8 @@
         <div class="form-group">
           <label class="form-label">Дата *</label>
           <input class="form-input" type="text" name="date" id="f-date"
-                 placeholder="01.01.2025 / 19:00"
+                 placeholder="2026-05-30 19:00"
+                 pattern="^(\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2})?|\d{2}\.\d{2}\.\d{4}( \d{2}:\d{2})?)$"
                  value="{{ event.date if event else '' }}" required>
         </div>
         <div class="form-group">

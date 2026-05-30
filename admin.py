@@ -1,12 +1,33 @@
+import re
+
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from database import (
     get_all_events_with_stats, get_event_by_id, create_event, update_event,
-    get_all_users, get_all_tickets, get_stats,
-    get_event_tickets_count, delete_user
+    get_all_users, get_tickets_grouped_by_event, get_stats,
+    get_event_tickets_count, delete_event, delete_user, parse_event_datetime
 )
 from auth import admin_required
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
+HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _normalize_color(value, fallback):
+    value = (value or "").strip()
+    return value if HEX_COLOR_RE.match(value) else fallback
+
+
+def _event_form_values():
+    return {
+        "title": request.form.get("title", "").strip(),
+        "description": request.form.get("description", "").strip(),
+        "date": request.form.get("date", "").strip(),
+        "location": request.form.get("location", "").strip(),
+        "capacity": request.form.get("capacity", "100").strip(),
+        "card_bg": _normalize_color(request.form.get("card_bg"), "#fdfdf5"),
+        "card_accent": _normalize_color(request.form.get("card_accent"), "#a898e0"),
+        "card_text": _normalize_color(request.form.get("card_text"), "#2a2a2a"),
+    }
 
 # ───────────────────────── дашборд ─────────────────────────────────
 
@@ -37,29 +58,25 @@ def events_list():
 @admin_required
 def event_create():
     if request.method == "POST":
-        title       = request.form.get("title", "").strip()
-        description = request.form.get("description", "").strip()
-        date        = request.form.get("date", "").strip()
-        location    = request.form.get("location", "").strip()
-        capacity    = request.form.get("capacity", "100").strip()
-        card_bg     = request.form.get("card_bg", "#fdfdf5").strip()
-        card_accent = request.form.get("card_accent", "#a898e0").strip()
-        card_text   = request.form.get("card_text", "#2a2a2a").strip()
+        values = _event_form_values()
 
-        if not all([title, date]):
+        if not all([values["title"], values["date"]]):
             flash("Название и дата обязательны", "error")
+        elif parse_event_datetime(values["date"]) is None:
+            flash("Дата должна быть в формате 2026-05-30 19:00 или 30.05.2026 19:00", "error")
+            return render_template("admin/event_form.html", event=values)
         else:
             try:
-                capacity = int(capacity)
+                capacity = int(values["capacity"])
                 if capacity <= 0:
                     raise ValueError
             except ValueError:
                 flash("Вместимость должна быть положительным числом", "error")
-                return render_template("admin/event_form.html", event=None)
+                return render_template("admin/event_form.html", event=values)
 
-            create_event(title, description, date, location, capacity,
-                         card_bg, card_accent, card_text)
-            flash(f"Мероприятие «{title}» создано", "success")
+            create_event(values["title"], values["description"], values["date"], values["location"], capacity,
+                         values["card_bg"], values["card_accent"], values["card_text"])
+            flash(f"Мероприятие «{values['title']}» создано", "success")
             return redirect(url_for("admin.events_list"))
 
     return render_template("admin/event_form.html", event=None)
@@ -74,32 +91,43 @@ def event_edit(event_id):
         return redirect(url_for("admin.events_list"))
 
     if request.method == "POST":
-        title       = request.form.get("title", "").strip()
-        description = request.form.get("description", "").strip()
-        date        = request.form.get("date", "").strip()
-        location    = request.form.get("location", "").strip()
-        capacity    = request.form.get("capacity", "100").strip()
-        card_bg     = request.form.get("card_bg", "#fdfdf5").strip()
-        card_accent = request.form.get("card_accent", "#a898e0").strip()
-        card_text   = request.form.get("card_text", "#2a2a2a").strip()
+        values = _event_form_values()
+        values["id"] = event_id
 
-        if not all([title, date]):
+        if not all([values["title"], values["date"]]):
             flash("Название и дата обязательны", "error")
+        elif parse_event_datetime(values["date"]) is None:
+            flash("Дата должна быть в формате 2026-05-30 19:00 или 30.05.2026 19:00", "error")
+            return render_template("admin/event_form.html", event=values)
         else:
             try:
-                capacity = int(capacity)
+                capacity = int(values["capacity"])
                 if capacity <= 0:
                     raise ValueError
             except ValueError:
                 flash("Вместимость должна быть положительным числом", "error")
-                return render_template("admin/event_form.html", event=event)
+                return render_template("admin/event_form.html", event=values)
 
-            update_event(event_id, title, description, date, location, capacity,
-                         card_bg, card_accent, card_text)
+            update_event(event_id, values["title"], values["description"], values["date"], values["location"], capacity,
+                         values["card_bg"], values["card_accent"], values["card_text"])
             flash("Мероприятие обновлено", "success")
             return redirect(url_for("admin.events_list"))
 
     return render_template("admin/event_form.html", event=event)
+
+
+@admin.route("/events/<int:event_id>/delete", methods=["POST"])
+@admin_required
+def event_delete(event_id):
+    event = get_event_by_id(event_id)
+    if event is None:
+        flash("Мероприятие не найдено", "error")
+        return redirect(url_for("admin.events_list"))
+
+    tickets_count = get_event_tickets_count(event_id)
+    delete_event(event_id)
+    flash(f"Мероприятие «{event['title']}» удалено. Билетов удалено: {tickets_count}", "success")
+    return redirect(url_for("admin.events_list"))
 
 # ───────────────────────── пользователи ────────────────────────────
 
@@ -135,8 +163,11 @@ def toggle_admin(user_id):
 @admin.route("/tickets")
 @admin_required
 def tickets_list():
-    tickets = get_all_tickets()
-    return render_template("admin/tickets.html", tickets=tickets)
+    ticket_groups = get_tickets_grouped_by_event()
+    tickets_count = sum(group["total_tickets"] for group in ticket_groups)
+    return render_template("admin/tickets.html",
+                           ticket_groups=ticket_groups,
+                           tickets_count=tickets_count)
 
 
 @admin.route("/scan")

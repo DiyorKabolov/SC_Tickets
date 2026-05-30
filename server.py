@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify, flash, redirect, url_for
 from flask_wtf.csrf import CSRFProtect
 from database import init_db, check_ticket
-from auth import auth
+from auth import auth, admin_required
 from events import events
 from admin import admin
 from pyngrok import ngrok
 import os
+import secrets
 from datetime import timedelta
 from dotenv import load_dotenv
 
@@ -14,9 +15,12 @@ load_dotenv()
 app = Flask(__name__)
 
 # Секретный ключ для сессий (должен быть задан до CSRFProtect)
-app.secret_key = os.getenv("SECRET_KEY", "change-this-in-production")
+app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
 app.permanent_session_lifetime = timedelta(days=30)
 app.config["SESSION_REFRESH_EACH_REQUEST"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0") == "1"
 
 csrf = CSRFProtect(app)
 
@@ -37,14 +41,14 @@ app.register_blueprint(events)
 app.register_blueprint(admin)
 
 # ───────────────────── API сканера ──────────────────────────────────
-@app.route("/used", methods=["GET"])
-@csrf.exempt
+@app.route("/used", methods=["POST"])
+@admin_required
 def check():
-    ticket_id = request.args.get("ticket_id")
+    payload = request.get_json(silent=True) or request.form
+    ticket_id = (payload.get("ticket_id") or "").strip()
     if not ticket_id:
-        return "Ошибка: не передан ticket_id", 400
+        return jsonify({"ok": False, "message": "Не передан ticket_id"}), 400
     result = check_ticket(ticket_id)
-    print(result)
     return jsonify(result)
 
 @app.errorhandler(400)
@@ -58,11 +62,15 @@ def handle_csrf_error(e):
 init_db()
 
 if __name__ == "__main__":
-    # ngrok connect (optional/conditional)
-    try:
-        public_url = ngrok.connect(5000)
-        print("Public URL:", public_url)
-    except Exception as e:
-        print("Ngrok not connected:", e)
+    host = os.getenv("FLASK_HOST", "127.0.0.1")
+    port = int(os.getenv("FLASK_PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    if os.getenv("ENABLE_NGROK", "0") == "1":
+        try:
+            public_url = ngrok.connect(port)
+            print("Public URL:", public_url)
+        except Exception as e:
+            print("Ngrok not connected:", e)
+
+    app.run(host=host, port=port, debug=debug)

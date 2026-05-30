@@ -1,13 +1,15 @@
 ﻿import sqlite3
 import bcrypt
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, time
 from contextlib import contextmanager
 from dotenv import load_dotenv
 
 load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+VERIFY_TOKEN_TTL_MINUTES = int(os.getenv("VERIFY_TOKEN_TTL_MINUTES", "10"))
+VERIFY_MAX_ATTEMPTS = int(os.getenv("VERIFY_MAX_ATTEMPTS", "5"))
 db_path_from_env = os.getenv("DB_PATH")
 if db_path_from_env:
     DB_PATH = db_path_from_env if os.path.isabs(db_path_from_env) else os.path.join(BASE_DIR, db_path_from_env)
@@ -35,6 +37,8 @@ def init_db():
                 role TEXT DEFAULT 'user',
                 is_verified INTEGER DEFAULT 0,
                 verify_token TEXT,
+                verify_token_created_at TIMESTAMP,
+                verify_attempts INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -77,7 +81,47 @@ def init_db():
                 cursor.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT DEFAULT {default}")
             except sqlite3.OperationalError:
                 pass
+
+        for col, definition in [
+            ("verify_token_created_at", "TIMESTAMP"),
+            ("verify_attempts", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            except sqlite3.OperationalError:
+                pass
+
+        cursor.execute("DROP INDEX IF EXISTS idx_tickets_user_event")
         conn.commit()
+
+
+def parse_event_datetime(event_date_raw):
+    if not event_date_raw:
+        return None
+
+    value = event_date_raw.strip()
+    formats = (
+        ("%Y-%m-%dT%H:%M", False),
+        ("%Y-%m-%d %H:%M", False),
+        ("%d.%m.%Y %H:%M", False),
+        ("%d.%m.%Y", True),
+        ("%Y-%m-%d", True),
+    )
+
+    for fmt, is_date_only in formats:
+        try:
+            parsed = datetime.strptime(value, fmt)
+            if is_date_only:
+                parsed = datetime.combine(parsed.date(), time.max)
+            return parsed
+        except ValueError:
+            continue
+    return None
+
+
+def is_event_expired(event_date_raw):
+    event_dt = parse_event_datetime(event_date_raw)
+    return bool(event_dt and event_dt < datetime.now())
 
 # â”€â”€ Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -126,17 +170,45 @@ def get_all_users():
 def set_verify_token(user_id, token):
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("UPDATE users SET verify_token=? WHERE id=?", (token, user_id))
+        cursor.execute("""
+            UPDATE users
+            SET verify_token=?, verify_token_created_at=CURRENT_TIMESTAMP, verify_attempts=0
+            WHERE id=?
+        """, (token, user_id))
         conn.commit()
 
 def verify_email_token(user_id, code):
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT verify_token FROM users WHERE id=?", (user_id,))
+        cursor.execute("""
+            SELECT verify_token, verify_token_created_at, verify_attempts
+            FROM users
+            WHERE id=?
+        """, (user_id,))
         row = cursor.fetchone()
-        if row is None or row["verify_token"] != code:
+        if row is None or not row["verify_token"]:
             return False
-        cursor.execute("UPDATE users SET is_verified=1, verify_token=NULL WHERE id=?", (user_id,))
+
+        attempts = row["verify_attempts"] or 0
+        if attempts >= VERIFY_MAX_ATTEMPTS:
+            return False
+
+        created_at = row["verify_token_created_at"]
+        if created_at:
+            created_dt = datetime.fromisoformat(str(created_at))
+            if created_dt + timedelta(minutes=VERIFY_TOKEN_TTL_MINUTES) < datetime.now():
+                return False
+
+        if row["verify_token"] != code:
+            cursor.execute("UPDATE users SET verify_attempts=verify_attempts + 1 WHERE id=?", (user_id,))
+            conn.commit()
+            return False
+
+        cursor.execute("""
+            UPDATE users
+            SET is_verified=1, verify_token=NULL, verify_token_created_at=NULL, verify_attempts=0
+            WHERE id=?
+        """, (user_id,))
         conn.commit()
         return True
 
@@ -194,37 +266,47 @@ def update_event(event_id, title, description, date, location, capacity,
               card_bg, card_accent, card_text, event_id))
         conn.commit()
 
+def delete_event(event_id):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM tickets WHERE event_id = ?", (event_id,))
+        cursor.execute("DELETE FROM events WHERE id = ?", (event_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+
 # â”€â”€ Tickets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def save_ticket(ticket_id, user_id=None, event_id=None):
     with get_db() as conn:
         try:
             cursor = conn.cursor()
-            # BEGIN IMMEDIATE locks the DB to prevent race conditions
             cursor.execute("BEGIN IMMEDIATE")
 
             cursor.execute("SELECT capacity FROM events WHERE id = ?", (event_id,))
             event = cursor.fetchone()
             if not event:
                 conn.rollback()
-                return False
+                return "not_found"
 
             cursor.execute("SELECT COUNT(*) FROM tickets WHERE event_id = ?", (event_id,))
             sold = cursor.fetchone()[0]
 
             if sold >= event['capacity']:
                 conn.rollback()
-                return False
+                return "full"
 
             cursor.execute(
-                "INSERT OR IGNORE INTO tickets (ticket_id, user_id, event_id) VALUES (?, ?, ?)",
+                "INSERT INTO tickets (ticket_id, user_id, event_id) VALUES (?, ?, ?)",
                 (ticket_id, user_id, event_id)
             )
             conn.commit()
-            return True
+            return "success"
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            return "error"
         except Exception:
             conn.rollback()
-            return False
+            return "error"
 
 
 def get_user_tickets(user_id):
@@ -253,38 +335,97 @@ def get_all_tickets():
         """)
         return [dict(row) for row in cursor.fetchall()]
 
-def check_ticket(ticket_id):
+def get_tickets_grouped_by_event():
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT t.used, e.date AS event_date
+            SELECT e.*,
+                   COUNT(t.id) as total_tickets,
+                   COALESCE(SUM(CASE WHEN t.used = 1 THEN 1 ELSE 0 END), 0) as used_tickets
+            FROM events e
+            LEFT JOIN tickets t ON e.id = t.event_id
+            GROUP BY e.id
+            ORDER BY e.date ASC
+        """)
+        groups = [dict(row) for row in cursor.fetchall()]
+        groups_by_id = {}
+        for group in groups:
+            group["tickets"] = []
+            group["unused_tickets"] = group["total_tickets"] - group["used_tickets"]
+            groups_by_id[group["id"]] = group
+
+        cursor.execute("""
+            SELECT t.*, u.username, u.email, e.title as event_title
             FROM tickets t
+            LEFT JOIN users u ON t.user_id = u.id
             LEFT JOIN events e ON t.event_id = e.id
-            WHERE t.ticket_id = ?
-        """, (ticket_id,))
-        result = cursor.fetchone()
+            ORDER BY e.date ASC, t.created_at DESC
+        """)
+        orphan_group = None
+        for row in cursor.fetchall():
+            ticket = dict(row)
+            group = groups_by_id.get(ticket["event_id"])
+            if group is None:
+                if orphan_group is None:
+                    orphan_group = {
+                        "id": None,
+                        "title": "Без мероприятия",
+                        "date": "—",
+                        "location": "",
+                        "capacity": 0,
+                        "total_tickets": 0,
+                        "used_tickets": 0,
+                        "unused_tickets": 0,
+                        "tickets": [],
+                    }
+                    groups.append(orphan_group)
+                group = orphan_group
 
-        if result is None:
-            return {"ok": False, "message": "\u0411\u0438\u043b\u0435\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d"}
-        if result[0] == 1:
-            return {"ok": False, "message": "\u0411\u0438\u043b\u0435\u0442 \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d"}
+            group["tickets"].append(ticket)
+            if group is orphan_group:
+                group["total_tickets"] += 1
+                group["used_tickets"] += 1 if ticket["used"] else 0
+                group["unused_tickets"] = group["total_tickets"] - group["used_tickets"]
 
-        event_date = (result["event_date"] or "").strip()
-        if event_date:
-            now = datetime.now()
-            parsed_dt = None
-            for fmt in ("%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", "%d.%m.%Y", "%Y-%m-%d"):
-                try:
-                    parsed_dt = datetime.strptime(event_date, fmt)
-                    break
-                except ValueError:
-                    continue
-            if parsed_dt and parsed_dt < now:
-                return {"ok": False, "message": "\u0411\u0438\u043b\u0435\u0442 \u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d"}
+        return groups
 
-        cursor.execute("UPDATE tickets SET used = 1 WHERE ticket_id = ?", (ticket_id,))
-        conn.commit()
-        return {"ok": True, "message": "\u0411\u0438\u043b\u0435\u0442 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u0435\u043d"}
+def check_ticket(ticket_id):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("BEGIN IMMEDIATE")
+            cursor.execute("""
+                SELECT t.used, e.date AS event_date
+                FROM tickets t
+                LEFT JOIN events e ON t.event_id = e.id
+                WHERE t.ticket_id = ?
+            """, (ticket_id,))
+            result = cursor.fetchone()
+
+            if result is None:
+                conn.rollback()
+                return {"ok": False, "message": "Билет не найден"}
+            if result["used"] == 1:
+                conn.rollback()
+                return {"ok": False, "message": "Билет уже использован"}
+            if is_event_expired(result["event_date"]):
+                conn.rollback()
+                return {"ok": False, "message": "Билет просрочен"}
+
+            cursor.execute("""
+                UPDATE tickets
+                SET used = 1
+                WHERE ticket_id = ? AND used = 0
+            """, (ticket_id,))
+            if cursor.rowcount != 1:
+                conn.rollback()
+                return {"ok": False, "message": "Билет уже использован"}
+
+            conn.commit()
+            return {"ok": True, "message": "Билет действителен"}
+        except Exception:
+            conn.rollback()
+            return {"ok": False, "message": "Ошибка проверки билета"}
 
 # â”€â”€ Admin stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

@@ -41,7 +41,7 @@
                     </button>
                   </form>
                   <form action="{{ url_for('admin.delete_user_route', user_id=user.id) }}" method="POST"
-                        onsubmit="return confirm('Удалить {{ user.username }}?')">
+                        onsubmit='return confirm({{ ("Удалить " ~ user.username ~ "?")|tojson }})'>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-danger btn-sm">Удалить</button>
                   </form>

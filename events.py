@@ -2,30 +2,19 @@ import uuid
 import qrcode
 import io
 import base64
-import os
-from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, flash, session, send_file, jsonify
 from database import (
     get_all_events_with_stats, get_event_by_id,
-    save_ticket, get_user_tickets
+    save_ticket, get_user_tickets, is_event_expired
 )
 from auth import login_required
-from main import generate_ticket, OUTPUT_DIR
+from main import generate_ticket
 
 events = Blueprint("events", __name__)
 
 
 def _is_ticket_expired(event_date_raw):
-    if not event_date_raw:
-        return False
-    now = datetime.now()
-    for fmt in ("%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", "%d.%m.%Y", "%Y-%m-%d"):
-        try:
-            event_dt = datetime.strptime(event_date_raw.strip(), fmt)
-            return event_dt < now
-        except ValueError:
-            continue
-    return False
+    return is_event_expired(event_date_raw)
 
 # ───────────────────────── афиша ───────────────────────────────────
 
@@ -57,14 +46,7 @@ def event_page(event_id):
     event["available"] = event["capacity"] - sold
     event["is_full"] = event["available"] <= 0
 
-    user_has_ticket = False
-    if "user_id" in session:
-        user_tickets = get_user_tickets(session["user_id"])
-        user_has_ticket = any(t["event_id"] == event_id for t in user_tickets)
-
-    return render_template("event.html",
-                           event=event,
-                           user_has_ticket=user_has_ticket)
+    return render_template("event.html", event=event)
 
 # ───────────────────────── получить билет ──────────────────────────
 
@@ -76,17 +58,14 @@ def buy_ticket(event_id):
         flash("Мероприятие не найдено", "error")
         return redirect(url_for("events.index"))
 
-    user_tickets = get_user_tickets(session["user_id"])
-    if any(t["event_id"] == event_id for t in user_tickets):
-        flash("У вас уже есть билет на это мероприятие", "error")
-        return redirect(url_for("events.event_page", event_id=event_id))
-
     ticket_id = str(uuid.uuid4())
-    # Database handles capacity and race conditions in save_ticket
-    success = save_ticket(ticket_id, user_id=session["user_id"], event_id=event_id)
+    result = save_ticket(ticket_id, user_id=session["user_id"], event_id=event_id)
 
-    if not success:
+    if result == "full":
         flash("К сожалению, билеты закончились", "error")
+        return redirect(url_for("events.event_page", event_id=event_id))
+    if result != "success":
+        flash("Не удалось создать билет. Попробуйте ещё раз.", "error")
         return redirect(url_for("events.event_page", event_id=event_id))
 
     try:
@@ -116,6 +95,20 @@ def cabinet():
         ticket["is_expired"] = _is_ticket_expired(ticket.get("event_date"))
 
     return render_template("cabinet.html", tickets=tickets)
+
+
+@events.route("/profile")
+@login_required
+def profile():
+    tickets = get_user_tickets(session["user_id"])
+    active_count = sum(1 for ticket in tickets if not ticket["used"] and not _is_ticket_expired(ticket.get("event_date")))
+    used_count = sum(1 for ticket in tickets if ticket["used"])
+    return render_template(
+        "profile.html",
+        tickets_count=len(tickets),
+        active_count=active_count,
+        used_count=used_count,
+    )
 
 
 @events.route("/cabinet/status")

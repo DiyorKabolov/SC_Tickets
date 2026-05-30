@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Личный кабинет — SC Tickets{% endblock %}
+
+{% block head %}
+<style>
+  .profile-wrap {
+    min-height: calc(100dvh - 56px);
+    padding: 48px 24px 96px;
+  }
+
+  .profile-inner {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .profile-header {
+    margin-bottom: 28px;
+  }
+
+  .profile-kicker {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .profile-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: clamp(28px, 6vw, 42px);
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+
+  .profile-sub {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .profile-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .profile-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+
+  .profile-stat-value {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 26px;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .profile-stat-label {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .profile-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .logout-inline {
+    margin: 0;
+  }
+
+  @media (max-width: 620px) {
+    .profile-grid { grid-template-columns: 1fr; }
+    .profile-actions { flex-direction: column; }
+    .profile-actions .btn,
+    .profile-actions form,
+    .profile-actions button { width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-wrap">
+  <div class="profile-inner">
+    <div class="profile-header">
+      <div class="profile-kicker">{{ session.username }}</div>
+      <h1 class="profile-title">Личный кабинет</h1>
+      <p class="profile-sub">Управление аккаунтом и быстрый доступ к билетам.</p>
+    </div>
+
+    <div class="profile-grid">
+      <div class="profile-stat">
+        <div class="profile-stat-value">{{ tickets_count }}</div>
+        <div class="profile-stat-label">Всего билетов</div>
+      </div>
+      <div class="profile-stat">
+        <div class="profile-stat-value">{{ active_count }}</div>
+        <div class="profile-stat-label">Активных</div>
+      </div>
+      <div class="profile-stat">
+        <div class="profile-stat-value">{{ used_count }}</div>
+        <div class="profile-stat-label">Использованных</div>
+      </div>
+    </div>
+
+    <div class="profile-actions">
+      <a href="{{ url_for('events.cabinet') }}" class="btn btn-primary">Мои билеты</a>
+      <a href="{{ url_for('events.index') }}" class="btn btn-ghost">Афиша</a>
+      <form action="{{ url_for('auth.logout') }}" method="POST" class="logout-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger">Выйти</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

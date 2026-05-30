@@ -269,6 +269,7 @@
     const statusMsg   = document.getElementById("statusMessage");
     const lastIdEl    = document.getElementById("lastId");
     const countEl     = document.getElementById("count");
+    const csrfToken   = "{{ csrf_token() }}";
 
     function triggerFlash(ok) {
       flash.className = "flash " + (ok ? "ok-flash" : "err-flash");
@@ -292,7 +293,14 @@
 
       decodedText = decodedText.trim();
 
-      fetch(`/used?ticket_id=${encodeURIComponent(decodedText)}`)
+      fetch("/used", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken
+        },
+        body: JSON.stringify({ ticket_id: decodedText })
+      })
         .then(r => r.json())
         .then(data => {
   if (data.ok) {        // ✅ только валидные билеты

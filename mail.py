@@ -1,6 +1,7 @@
 import smtplib
 import os
 import threading
+from html import escape
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -14,6 +15,11 @@ def send_verify_email(to_email, username, code):
     """Sends verification email in a background thread."""
     def send():
         try:
+            if not MAIL_FROM or not MAIL_PASSWORD:
+                print("Email is not configured: set MAIL_FROM and MAIL_PASSWORD")
+                return
+
+            safe_username = escape(username)
             msg = MIMEMultipart("alternative")
             msg["Subject"] = "Код подтверждения — SC Tickets"
             msg["From"]    = MAIL_FROM
@@ -22,7 +28,7 @@ def send_verify_email(to_email, username, code):
             html = f"""
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
               <h2 style="margin-bottom:8px">SC·TICKETS</h2>
-              <p>Привет, <b>{username}</b>!</p>
+              <p>Привет, <b>{safe_username}</b>!</p>
               <p>Ваш код подтверждения:</p>
               <div style="margin:24px 0;text-align:center">
                 <span style="font-size:36px;font-weight:700;letter-spacing:12px;
@@ -43,4 +49,4 @@ def send_verify_email(to_email, username, code):
             print(f"Error sending email: {e}")
 
     # Run in background
-    threading.Thread(target=send).start()
+    threading.Thread(target=send, daemon=True).start()

@@ -5,4 +5,5 @@ __pycache__/
 tickets.db
 Generated_tickets/
 qr_ticket.png
+*.docx
 .vscode/
