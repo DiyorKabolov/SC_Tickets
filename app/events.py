@@ -1,14 +1,14 @@
-import uuid
+﻿import uuid
 import qrcode
 import io
 import base64
 from flask import Blueprint, render_template, redirect, url_for, flash, session, send_file, jsonify
-from database import (
+from app.database import (
     get_all_events_with_stats, get_event_by_id,
     save_ticket, get_user_tickets, is_event_expired
 )
-from auth import login_required
-from main import generate_ticket
+from app.auth import login_required
+from app.ticket import generate_ticket
 
 events = Blueprint("events", __name__)
 
@@ -16,7 +16,7 @@ events = Blueprint("events", __name__)
 def _is_ticket_expired(event_date_raw):
     return is_event_expired(event_date_raw)
 
-# ───────────────────────── афиша ───────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Ð°Ñ„Ð¸ÑˆÐ° â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @events.route("/")
 def index():
@@ -30,17 +30,17 @@ def index():
 
     return render_template("index.html", events=all_events)
 
-# ───────────────────────── страница события ─────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° ÑÐ¾Ð±Ñ‹Ñ‚Ð¸Ñ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @events.route("/event/<int:event_id>")
 def event_page(event_id):
     event = get_event_by_id(event_id)
     if event is None:
-        flash("Мероприятие не найдено", "error")
+        flash("ÐœÐµÑ€Ð¾Ð¿Ñ€Ð¸ÑÑ‚Ð¸Ðµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾", "error")
         return redirect(url_for("events.index"))
 
     # Stats for the specific event
-    from database import get_event_tickets_count
+    from app.database import get_event_tickets_count
     sold = get_event_tickets_count(event_id)
     event["sold"] = sold
     event["available"] = event["capacity"] - sold
@@ -48,36 +48,36 @@ def event_page(event_id):
 
     return render_template("event.html", event=event)
 
-# ───────────────────────── получить билет ──────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚ÑŒ Ð±Ð¸Ð»ÐµÑ‚ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @events.route("/event/<int:event_id>/buy", methods=["POST"])
 @login_required
 def buy_ticket(event_id):
     event = get_event_by_id(event_id)
     if event is None:
-        flash("Мероприятие не найдено", "error")
+        flash("ÐœÐµÑ€Ð¾Ð¿Ñ€Ð¸ÑÑ‚Ð¸Ðµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾", "error")
         return redirect(url_for("events.index"))
 
     ticket_id = str(uuid.uuid4())
     result = save_ticket(ticket_id, user_id=session["user_id"], event_id=event_id)
 
     if result == "full":
-        flash("К сожалению, билеты закончились", "error")
+        flash("Ðš ÑÐ¾Ð¶Ð°Ð»ÐµÐ½Ð¸ÑŽ, Ð±Ð¸Ð»ÐµÑ‚Ñ‹ Ð·Ð°ÐºÐ¾Ð½Ñ‡Ð¸Ð»Ð¸ÑÑŒ", "error")
         return redirect(url_for("events.event_page", event_id=event_id))
     if result != "success":
-        flash("Не удалось создать билет. Попробуйте ещё раз.", "error")
+        flash("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ð·Ð´Ð°Ñ‚ÑŒ Ð±Ð¸Ð»ÐµÑ‚. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÐµÑ‰Ñ‘ Ñ€Ð°Ð·.", "error")
         return redirect(url_for("events.event_page", event_id=event_id))
 
     try:
         generate_ticket(ticket_id=ticket_id, event=event)
-        flash("Билет успешно получен!", "success")
+        flash("Ð‘Ð¸Ð»ÐµÑ‚ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½!", "success")
     except Exception as e:
-        flash("Билет создан, но PDF не сгенерировался", "error")
-        print(f"Ошибка генерации PDF: {e}")
+        flash("Ð‘Ð¸Ð»ÐµÑ‚ ÑÐ¾Ð·Ð´Ð°Ð½, Ð½Ð¾ PDF Ð½Ðµ ÑÐ³ÐµÐ½ÐµÑ€Ð¸Ñ€Ð¾Ð²Ð°Ð»ÑÑ", "error")
+        print(f"ÐžÑˆÐ¸Ð±ÐºÐ° Ð³ÐµÐ½ÐµÑ€Ð°Ñ†Ð¸Ð¸ PDF: {e}")
 
     return redirect(url_for("events.cabinet"))
 
-# ───────────────────────── личный кабинет ──────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Ð»Ð¸Ñ‡Ð½Ñ‹Ð¹ ÐºÐ°Ð±Ð¸Ð½ÐµÑ‚ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @events.route("/cabinet")
 @login_required
@@ -124,7 +124,7 @@ def cabinet_status():
         })
     return jsonify({"tickets": payload})
 
-# ───────────────────────── скачать PDF ─────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ ÑÐºÐ°Ñ‡Ð°Ñ‚ÑŒ PDF â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @events.route("/ticket/<ticket_id>/pdf")
 @login_required
@@ -133,7 +133,7 @@ def download_ticket(ticket_id):
     ticket = next((t for t in user_tickets if t["ticket_id"] == ticket_id), None)
 
     if ticket is None:
-        flash("Билет не найден", "error")
+        flash("Ð‘Ð¸Ð»ÐµÑ‚ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", "error")
         return redirect(url_for("events.cabinet"))
 
     # Caching check in generate_ticket automatically handles existence

@@ -1,8 +1,8 @@
 import secrets
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from database import create_user, verify_user, get_user_by_id, set_verify_token, verify_email_token, get_user_by_email
-from mail import send_verify_email
+from app.database import create_user, verify_user, get_user_by_id, set_verify_token, verify_email_token, get_user_by_email
+from app.mail import send_verify_email
 from urllib.parse import urlparse
 
 # ───────────────────────── декораторы ──────────────────────────────

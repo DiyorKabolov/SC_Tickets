@@ -1,12 +1,12 @@
 import re
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from database import (
+from app.database import (
     get_all_events_with_stats, get_event_by_id, create_event, update_event,
     get_all_users, get_tickets_grouped_by_event, get_stats,
     get_event_tickets_count, delete_event, delete_user, parse_event_datetime
 )
-from auth import admin_required
+from app.auth import admin_required
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -141,7 +141,7 @@ def users_list():
 @admin.route("/users/<int:user_id>/toggle-admin", methods=["POST"])
 @admin_required
 def toggle_admin(user_id):
-    from database import get_user_by_id, set_user_role
+    from app.database import get_user_by_id, set_user_role
     from flask import session as sess
 
     if user_id == sess["user_id"]:

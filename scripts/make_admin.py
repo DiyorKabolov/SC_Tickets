@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 Script to promote a user to admin role
-Usage: python make_admin.py <username_or_email>
+Usage: python scripts/make_admin.py <username_or_email>
 """
 
 import sys
-from database import get_db, get_user_by_email, get_all_users
+from app.database import get_db
 
 def make_admin(identifier):
     """Make a user admin by username or email"""
