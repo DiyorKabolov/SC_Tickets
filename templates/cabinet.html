@@ -151,6 +151,36 @@
       calc(100% - 9px) 92%, 100% 96%,
       calc(100% - 9px) 100%, 0 100%
     );
+    /* Add a subtle inner shadow along the torn edge to suggest paper depth */
+    position: relative;
+  }
+
+  .ticket.used .ticket-left::after {
+    content: '';
+    position: absolute;
+    right: -9px;
+    top: 0;
+    bottom: 0;
+    width: 14px;
+    pointer-events: none;
+    background: linear-gradient(to right, rgba(0,0,0,0.12), rgba(0,0,0,0.02) 40%, rgba(0,0,0,0));
+    border-radius: 2px;
+    mix-blend-mode: multiply;
+    filter: blur(1px);
+  }
+
+  .ticket.used .ticket-left::before {
+    /* thin highlight to mimic torn paper fiber on the left piece */
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: linear-gradient(to right, rgba(255,255,255,0.85), rgba(255,255,255,0.2));
+    opacity: 0.6;
+    pointer-events: none;
+  }
   }
 
   .ticket.used .ticket-right {
@@ -176,6 +206,34 @@
       0 16%, 9px 12%,
       0 8%, 9px 4%, 0 0
     );
+    position: relative;
+  }
+
+  .ticket.used .ticket-right::after {
+    content: '';
+    position: absolute;
+    left: -9px;
+    top: 0;
+    bottom: 0;
+    width: 14px;
+    pointer-events: none;
+    background: linear-gradient(to left, rgba(0,0,0,0.12), rgba(0,0,0,0.02) 40%, rgba(0,0,0,0));
+    border-radius: 2px;
+    mix-blend-mode: multiply;
+    filter: blur(1px);
+  }
+
+  .ticket.used .ticket-right::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: linear-gradient(to left, rgba(255,255,255,0.85), rgba(255,255,255,0.2));
+    opacity: 0.6;
+    pointer-events: none;
+  }
   }
 
   /* ── Общие стили текста ── */
