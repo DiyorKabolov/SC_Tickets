@@ -54,6 +54,7 @@ def init_db():
                 card_bg TEXT DEFAULT '#fdfdf5',
                 card_accent TEXT DEFAULT '#a898e0',
                 card_text TEXT DEFAULT '#2a2a2a',
+                ticket_template TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -81,6 +82,11 @@ def init_db():
                 cursor.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT DEFAULT {default}")
             except sqlite3.OperationalError:
                 pass
+
+        try:
+            cursor.execute("ALTER TABLE events ADD COLUMN ticket_template TEXT")
+        except sqlite3.OperationalError:
+            pass
 
         for col, definition in [
             ("verify_token_created_at", "TIMESTAMP"),
@@ -215,15 +221,16 @@ def verify_email_token(user_id, code):
 # â”€â”€ Events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def create_event(title, description, date, location, capacity,
-                 card_bg="#fdfdf5", card_accent="#a898e0", card_text="#2a2a2a"):
+                 card_bg="#fdfdf5", card_accent="#a898e0", card_text="#2a2a2a",
+                 ticket_template=None):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO events (title, description, date, location, capacity,
-                                card_bg, card_accent, card_text)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                card_bg, card_accent, card_text, ticket_template)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (title, description, date, location, capacity,
-              card_bg, card_accent, card_text))
+              card_bg, card_accent, card_text, ticket_template))
         conn.commit()
         return cursor.lastrowid
 
@@ -254,16 +261,17 @@ def get_event_tickets_count(event_id):
         return cursor.fetchone()[0]
 
 def update_event(event_id, title, description, date, location, capacity,
-                 card_bg="#fdfdf5", card_accent="#a898e0", card_text="#2a2a2a"):
+                 card_bg="#fdfdf5", card_accent="#a898e0", card_text="#2a2a2a",
+                 ticket_template=None):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE events
             SET title=?, description=?, date=?, location=?, capacity=?,
-                card_bg=?, card_accent=?, card_text=?
+                card_bg=?, card_accent=?, card_text=?, ticket_template=?
             WHERE id=?
         """, (title, description, date, location, capacity,
-              card_bg, card_accent, card_text, event_id))
+              card_bg, card_accent, card_text, ticket_template, event_id))
         conn.commit()
 
 def delete_event(event_id):

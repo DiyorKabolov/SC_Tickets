@@ -1,6 +1,8 @@
+import os
 import re
-
+import uuid
 from flask import Blueprint, render_template, redirect, url_for, flash, request
+from werkzeug.utils import secure_filename
 from app.database import (
     get_all_events_with_stats, get_event_by_id, create_event, update_event,
     get_all_users, get_tickets_grouped_by_event, get_stats,
@@ -8,8 +10,37 @@ from app.database import (
 )
 from app.auth import admin_required
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "assets", "ticket_templates"))
+os.makedirs(TEMPLATE_DIR, exist_ok=True)
+
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _allowed_template(filename):
+    return filename.lower().endswith(".pdf")
+
+
+def _save_ticket_template(file):
+    if not file or not file.filename:
+        return None
+    filename = secure_filename(file.filename)
+    if not _allowed_template(filename):
+        return None
+    target_name = f"{uuid.uuid4().hex}_{filename}"
+    target_path = os.path.join(TEMPLATE_DIR, target_name)
+    file.save(target_path)
+    return target_name
+
+
+def _delete_ticket_template(filename):
+    if not filename:
+        return
+    try:
+        os.remove(os.path.join(TEMPLATE_DIR, filename))
+    except OSError:
+        pass
 
 
 def _normalize_color(value, fallback):
@@ -27,6 +58,7 @@ def _event_form_values():
         "card_bg": _normalize_color(request.form.get("card_bg"), "#fdfdf5"),
         "card_accent": _normalize_color(request.form.get("card_accent"), "#a898e0"),
         "card_text": _normalize_color(request.form.get("card_text"), "#2a2a2a"),
+        "ticket_template": request.form.get("ticket_template", "").strip(),
     }
 
 # ───────────────────────── дашборд ─────────────────────────────────
@@ -59,6 +91,7 @@ def events_list():
 def event_create():
     if request.method == "POST":
         values = _event_form_values()
+        template_file = request.files.get("ticket_template")
 
         if not all([values["title"], values["date"]]):
             flash("Название и дата обязательны", "error")
@@ -74,8 +107,15 @@ def event_create():
                 flash("Вместимость должна быть положительным числом", "error")
                 return render_template("admin/event_form.html", event=values)
 
+            ticket_template = None
+            if template_file and template_file.filename:
+                ticket_template = _save_ticket_template(template_file)
+                if ticket_template is None:
+                    flash("Загрузите корректный PDF-файл шаблона билета", "error")
+                    return render_template("admin/event_form.html", event=values)
+
             create_event(values["title"], values["description"], values["date"], values["location"], capacity,
-                         values["card_bg"], values["card_accent"], values["card_text"])
+                         values["card_bg"], values["card_accent"], values["card_text"], ticket_template)
             flash(f"Мероприятие «{values['title']}» создано", "success")
             return redirect(url_for("admin.events_list"))
 
@@ -93,6 +133,8 @@ def event_edit(event_id):
     if request.method == "POST":
         values = _event_form_values()
         values["id"] = event_id
+        values["ticket_template"] = event.get("ticket_template")
+        template_file = request.files.get("ticket_template")
 
         if not all([values["title"], values["date"]]):
             flash("Название и дата обязательны", "error")
@@ -108,8 +150,17 @@ def event_edit(event_id):
                 flash("Вместимость должна быть положительным числом", "error")
                 return render_template("admin/event_form.html", event=values)
 
+            ticket_template = event.get("ticket_template")
+            if template_file and template_file.filename:
+                new_template = _save_ticket_template(template_file)
+                if new_template is None:
+                    flash("Загрузите корректный PDF-файл шаблона билета", "error")
+                    return render_template("admin/event_form.html", event=values)
+                _delete_ticket_template(ticket_template)
+                ticket_template = new_template
+
             update_event(event_id, values["title"], values["description"], values["date"], values["location"], capacity,
-                         values["card_bg"], values["card_accent"], values["card_text"])
+                         values["card_bg"], values["card_accent"], values["card_text"], ticket_template)
             flash("Мероприятие обновлено", "success")
             return redirect(url_for("admin.events_list"))
 

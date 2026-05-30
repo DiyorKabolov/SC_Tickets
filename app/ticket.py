@@ -17,15 +17,25 @@ if not os.path.exists(FONT_PATH):
     # Запасной вариант (например, если шрифт в корне проекта)
     FONT_PATH = os.path.join(BASE_DIR, "arial.ttf")
 
-TEMPLATE_PATH = os.path.join(BASE_DIR, "..", "assets", "ghb.pdf")
+TEMPLATE_DIR = os.path.join(BASE_DIR, "..", "assets", "ticket_templates")
+DEFAULT_TEMPLATE_PATH = os.path.join(BASE_DIR, "..", "assets", "ghb.pdf")
 OUTPUT_DIR = os.path.join(BASE_DIR, "..", "Generated_tickets")
 # --------------
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(TEMPLATE_DIR, exist_ok=True)
 if os.path.exists(FONT_PATH):
     pdfmetrics.registerFont(TTFont('Arial', FONT_PATH))
 else:
     print(f"Warning: Font not found at {FONT_PATH}. PDF might have issues with Cyrillic.")
+
+
+def _get_template_path(event):
+    if event and event.get("ticket_template"):
+        custom_path = os.path.join(TEMPLATE_DIR, event["ticket_template"])
+        if os.path.exists(custom_path):
+            return custom_path
+    return DEFAULT_TEMPLATE_PATH
 
 
 def generate_ticket(ticket_id: str, event: dict = None):
@@ -58,12 +68,13 @@ def generate_ticket(ticket_id: str, event: dict = None):
     packet.seek(0)
 
 
-    if not os.path.exists(TEMPLATE_PATH):
+    template_path = _get_template_path(event)
+    if not os.path.exists(template_path):
         # Если шаблона нет, создаем просто PDF с данными
         with open(result_path, "wb") as f_out:
             f_out.write(packet.getbuffer())
     else:
-        template_pdf = PdfReader(TEMPLATE_PATH)
+        template_pdf = PdfReader(template_path)
         overlay_pdf  = PdfReader(packet)
         page = template_pdf.pages[0]
         page.merge_page(overlay_pdf.pages[0])

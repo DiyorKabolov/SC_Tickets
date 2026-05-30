@@ -211,7 +211,7 @@
 
   <!-- Левая часть — форма -->
   <div class="card">
-    <form method="post" id="eventForm">
+    <form method="post" enctype="multipart/form-data" id="eventForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-group">
         <label class="form-label">Название *</label>
@@ -244,6 +244,19 @@
         <input class="form-input" type="text" name="location" id="f-location"
                value="{{ event.location if event else '' }}"
                placeholder="Город, название площадки">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Шаблон PDF билета</label>
+        {% if event and event.ticket_template %}
+          <div class="form-note" style="margin-bottom:.75rem;color:var(--muted);font-size:13px">
+            Текущий шаблон: {{ event.ticket_template }}
+          </div>
+        {% endif %}
+        <input class="form-input" type="file" name="ticket_template" accept="application/pdf">
+        <div class="form-note" style="margin-top:.5rem;color:var(--muted);font-size:13px">
+          Загрузите PDF-файл шаблона, который будет использоваться для этого события. Оставьте пустым, чтобы использовать шаблон по умолчанию.
+        </div>
       </div>
 
       <!-- Редактор цветов -->
