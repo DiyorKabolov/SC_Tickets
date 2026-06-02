@@ -99,30 +99,6 @@
     padding: 20px 14px;
   }
 
-  /* When ticket is split (used), we render semicircles attached to each half
-     so the circular cutout visually remains. These activate only for the used state. */
-  .ticket.used .ticket-left::after,
-  .ticket.used .ticket-left::before,
-  .ticket.used .ticket-right::before,
-  .ticket.used .ticket-right::after {
-    content: '';
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    background: var(--bg);
-    border-radius: 50%;
-    z-index: 2;
-    pointer-events: none;
-  }
-
-  /* left piece: right-hand semicircles (top and bottom) */
-  .ticket.used .ticket-left::after { right: -9px; top: -9px; clip-path: inset(0 0 0 50%); }
-  .ticket.used .ticket-left::before { right: -9px; bottom: -9px; clip-path: inset(0 0 0 50%); }
-
-  /* right piece: left-hand semicircles (top and bottom) */
-  .ticket.used .ticket-right::before { left: -9px; top: -9px; clip-path: inset(0 50% 0 0); }
-  .ticket.used .ticket-right::after  { left: -9px; bottom: -9px; clip-path: inset(0 50% 0 0); }
-
   /* ── Использованный (рваный) билет ── */
   .ticket.used {
     overflow: visible;
@@ -135,36 +111,8 @@
     opacity: 0.85;
   }
 
-  /* Replace heavy SVG strip with subtle highlight + shadow so QR isn't obscured */
   .ticket.used::before,
-  .ticket.used::after { content: none; }
-
-  /* thin bright edge on the left piece (paper fibers) */
-  .ticket.used .ticket-left::after {
-    content: '';
-    position: absolute;
-    right: -6px;
-    top: 6px;
-    bottom: 6px;
-    width: 2px;
-    background: linear-gradient(to right, rgba(255,255,255,0.95), rgba(255,255,255,0.2));
-    border-radius: 1px;
-    pointer-events: none;
-    z-index: 3;
-  }
-
-  /* faint shadow on the right piece to suggest separation */
-  .ticket.used .ticket-right::before {
-    content: '';
-    position: absolute;
-    left: -6px;
-    top: 6px;
-    bottom: 6px;
-    width: 6px;
-    background: linear-gradient(to left, rgba(0,0,0,0.08), rgba(0,0,0,0));
-    pointer-events: none;
-    z-index: 2;
-  }
+  .ticket.used::after { display: none; }
 
   .ticket.used .ticket-left {
     flex: 1;
@@ -190,20 +138,6 @@
       calc(100% - 7px) 92%, 100% 96%,
       calc(100% - 7px) 100%, 0 100%
     );
-  }
-
-  /* subtle torn-edge texture + inner shadow for realism */
-  .ticket.used .ticket-left::after,
-  .ticket.used .ticket-right::before {
-    /* these ::after/::before are already used for semicircles; add an adjacent
-       thin gradient element by using an extra pseudo via a child overlay element
-       simulated with box-shadow on the piece itself */
-  }
-
-  .ticket.used .ticket-left,
-  .ticket.used .ticket-right {
-    /* add tiny inner shadow along the torn edge */
-    box-shadow: 0 12px 40px rgba(0,0,0,0.28);
   }
 
   .ticket.used .ticket-right {
