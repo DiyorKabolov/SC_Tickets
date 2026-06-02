@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SC-Tickets — SPA Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui'] },
+          colors: {
+            canvas: '#0b0c0e',
+            sheet: '#0f1013',
+            sheet2: '#131418',
+            outline: '#1f2128',
+            accent1: '#a78bfa',
+            accent2: '#8b5cf6',
+            paper: '#fdfbf7',
+            paperText: '#111827',
+            stubPurple: '#b4a2f8',
+            stubGold: '#f5c242'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root { --bg: #0b0c0e; }
+    body { background: radial-gradient(circle at 10% 10%, rgba(167,139,250,0.06), transparent 30%), radial-gradient(circle at 90% 90%, rgba(139,92,246,0.03), transparent 30%), var(--bg); }
+    .transition-ease { transition: all 200ms cubic-bezier(.2,.8,.2,1); }
+    .card-hover:hover { transform: translateY(-6px) scale(1.003); box-shadow: 0 30px 80px rgba(139,92,246,0.12); }
+    /* Ticket perforation and notches */
+    .ticket-notch { background: var(--bg); width: 28px; height: 28px; border-radius: 9999px; position: absolute; left: -14px; }
+  </style>
+</head>
+<body class="font-sans text-gray-200 min-h-screen antialiased">
+  <div class="max-w-[1200px] mx-auto px-4">
+    <!-- Header -->
+    <header class="flex items-center justify-between py-6 sticky top-0 z-40" style="backdrop-filter: blur(6px);">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 text-white">
+          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-accent1 to-accent2 flex items-center justify-center shadow-md">
+            <i class="fa-solid fa-ticket text-black"></i>
+          </div>
+          <div class="font-bold text-lg">SC-TICKETS</div>
+        </div>
+      </div>
+
+      <nav class="hidden md:flex items-center gap-6">
+        <button data-tab="afisha" class="nav-btn px-3 py-2 text-sm font-medium rounded-full">Афиша</button>
+        <button data-tab="details" class="nav-btn px-3 py-2 text-sm font-medium rounded-full">Описание события</button>
+        <button data-tab="tickets" class="nav-btn px-3 py-2 text-sm font-medium rounded-full">Мои билеты</button>
+        <button data-tab="profile" class="nav-btn px-3 py-2 text-sm font-medium rounded-full">Личный кабинет</button>
+      </nav>
+
+      <div class="flex items-center gap-4">
+        <div class="hidden sm:block text-sm text-gray-300">Привет, <strong class="text-white">Диёр</strong></div>
+        <div class="flex items-center gap-2 bg-[#1b1d22] px-3 py-1 rounded-full">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400/20 to-transparent flex items-center justify-center text-yellow-400">A</div>
+          <div class="text-xs font-semibold text-yellow-400 px-2 py-1 rounded-full" style="background:rgba(226,185,59,0.08);">Admin</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main SPA containers -->
+    <main class="mt-6">
+      <!-- Afisha -->
+      <section id="afisha" class="tab-section block">
+        <div class="afisha-header text-center mb-6">
+          <div class="text-sm uppercase tracking-widest text-accent1 font-semibold">Ближайшие события</div>
+          <h1 class="text-4xl font-extrabold mt-2 text-white drop-shadow">Афиша</h1>
+          <p class="text-gray-400 mt-2">Выберите мероприятие и получите электронный билет</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div class="flex gap-3 w-full md:w-2/3">
+            <div class="relative flex-1">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"><i class="fa-solid fa-magnifying-glass"></i></span>
+              <input id="search" type="search" placeholder="Поиск событий, мест, артистов..." class="pl-10 pr-4 py-3 rounded-xl bg-[#0f1013] border border-[rgba(255,255,255,0.03)] w-full text-sm focus:outline-none focus:ring-2 focus:ring-accent1 transition-ease" />
+            </div>
+            <div class="hidden sm:flex gap-2">
+              <button data-filter="Все" class="filter-pill px-4 py-2 rounded-full bg-[#121214] text-sm">Все</button>
+              <button data-filter="Кино" class="filter-pill px-4 py-2 rounded-full bg-[#121214] text-sm">Кино</button>
+              <button data-filter="Лекции" class="filter-pill px-4 py-2 rounded-full bg-[#121214] text-sm">Лекции</button>
+              <button data-filter="Балы" class="filter-pill px-4 py-2 rounded-full bg-[#121214] text-sm">Балы</button>
+              <button data-filter="Театр" class="filter-pill px-4 py-2 rounded-full bg-[#121214] text-sm">Театр</button>
+            </div>
+          </div>
+
+          <div class="flex gap-3 items-center">
+            <select id="dateFilter" class="filter-select bg-[#0f1013] px-3 py-2 rounded-lg text-sm">
+              <option value="all">Все даты</option>
+              <option value="this_week">На этой неделе</option>
+              <option value="next_month">В следующем месяце</option>
+            </select>
+            <select id="locationFilter" class="filter-select bg-[#0f1013] px-3 py-2 rounded-lg text-sm">
+              <option value="Все">Все локации</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Events grid -->
+        <div id="eventsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- cards injected by JS -->
+        </div>
+
+      </section>
+
+      <!-- Details -->
+      <section id="details" class="tab-section hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div class="lg:col-span-8">
+            <a href="#" id="backToAfisha" class="text-sm text-accent1 hover:underline">← Назад к афише</a>
+            <h2 id="detailTitle" class="text-3xl font-extrabold text-white mt-3">Весенний бал</h2>
+            <div class="flex gap-3 items-center mt-3">
+              <span class="px-3 py-1 rounded-full text-xs font-semibold bg-[#131418] text-accent1">10.07.2026 • 21:00</span>
+              <span class="px-3 py-1 rounded-full text-xs font-semibold bg-[#131418] text-gray-300">Филиал МГУ, спортивная площадка</span>
+            </div>
+
+            <div id="detailBanner" class="mt-6 rounded-xl overflow-hidden relative" style="min-height:300px; background:linear-gradient(120deg, rgba(167,139,250,0.12), rgba(139,92,246,0.08));">
+              <div class="absolute bottom-6 left-6 bg-white/5 text-white/90 px-4 py-2 rounded-lg">Дресс-код: Вечерний · Фуршет включен</div>
+            </div>
+
+            <div class="mt-6 text-gray-300 leading-relaxed">
+              <p class="mb-4">Добро пожаловать на ежегодный Весенний бал — ночь изысканности, музыки и танцев. В программе — живая оркестровая музыка, профессиональные фотографы и изысканное угощение.</p>
+              <p class="mb-4">Просим соблюдать дресс-код: вечерняя одежда. Мероприятие бесплатное, но необходима регистрация — количество мест ограничено.</p>
+
+              <ul class="space-y-3 mt-4">
+                <li class="flex items-start gap-3"><i class="fa-solid fa-circle-check text-accent1 mt-1"></i> Живая оркестровая музыка</li>
+                <li class="flex items-start gap-3"><i class="fa-solid fa-circle-check text-accent1 mt-1"></i> Профессиональная фотосъемка</li>
+                <li class="flex items-start gap-3"><i class="fa-solid fa-circle-check text-accent1 mt-1"></i> Фуршет и десерты</li>
+              </ul>
+            </div>
+          </div>
+
+          <aside class="lg:col-span-4">
+            <div class="sticky top-24 bg-gradient-to-b from-[#101014] to-[#0f1114] p-6 rounded-xl shadow-lg">
+              <div class="text-sm text-gray-400">Входной билет</div>
+              <div class="text-2xl font-bold text-white mt-2">Бесплатно</div>
+              <div class="mt-4">
+                <div class="text-sm text-gray-400 mb-2">Занято <span id="detailPercent" class="text-white font-semibold">3%</span></div>
+                <div class="w-full bg-[#0b0b0c] rounded-full h-2 overflow-hidden">
+                  <div id="detailProgress" class="h-2 bg-gradient-to-r from-accent1 to-accent2" style="width:3%"></div>
+                </div>
+                <div class="text-xs text-gray-400 mt-2">194 осталось</div>
+              </div>
+
+              <button id="registerBtn" class="w-full mt-5 py-3 rounded-lg text-black font-semibold bg-gradient-to-r from-accent1 to-accent2 shadow-xl hover:scale-[1.01] transition-ease">Зарегистрироваться бесплатно</button>
+
+              <div class="flex gap-3 mt-4">
+                <button class="flex-1 py-2 rounded-lg bg-[#0f1013] text-sm">В календарь</button>
+                <button class="flex-1 py-2 rounded-lg bg-[#0f1013] text-sm">Поделиться</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- Tickets -->
+      <section id="tickets" class="tab-section hidden">
+        <div class="mb-4">
+          <div id="toast" class="hidden p-3 rounded-lg border" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.12);color:#10b981;">✓ Билет успешно получен!</div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- ticket cards populated by JS -->
+        </div>
+      </section>
+
+      <!-- Profile -->
+      <section id="profile" class="tab-section hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <aside class="lg:col-span-3 bg-[#0f1013] p-6 rounded-xl">
+            <div class="flex flex-col items-center gap-3">
+              <div class="w-24 h-24 rounded-full bg-gradient-to-br from-[#a78bfa] to-[#8b5cf6] flex items-center justify-center text-black text-2xl font-bold">D</div>
+              <div class="text-white font-semibold">Диёр</div>
+              <div class="text-xs text-yellow-400" style="background:rgba(226,185,59,0.06);padding:4px 8px;border-radius:6px;">Администратор системы</div>
+            </div>
+
+            <nav class="mt-6 space-y-2">
+              <a href="#" class="block px-3 py-2 rounded-lg bg-transparent hover:bg-[#131418]">Общая сводка</a>
+              <a href="#" class="block px-3 py-2 rounded-lg hover:bg-[#131418]">Настройки профиля</a>
+              <a href="#" class="block px-3 py-2 rounded-lg hover:bg-[#131418]">Безопасность</a>
+            </nav>
+          </aside>
+
+          <main class="lg:col-span-9">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div class="p-4 rounded-xl bg-[#0f1013]"> <div class="text-sm text-gray-400">Всего билетов</div><div class="text-xl font-bold mt-1">7</div></div>
+              <div class="p-4 rounded-xl bg-[#0f1013]"> <div class="text-sm text-gray-400">Активных событий</div><div class="text-xl font-bold mt-1">2</div></div>
+              <div class="p-4 rounded-xl bg-[#0f1013]"> <div class="text-sm text-gray-400">Бонусных баллов</div><div class="text-xl font-bold mt-1">300</div></div>
+            </div>
+
+            <div class="bg-[#0f1013] p-6 rounded-xl">
+              <h3 class="text-lg font-semibold mb-3">Персональные данные</h3>
+              <form class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input class="bg-[#131418] p-3 rounded-lg" value="Диёр" />
+                <input class="bg-[#131418] p-3 rounded-lg" value="diyor@sc-tickets.com" />
+                <div class="md:col-span-2 text-right">
+                  <button class="px-4 py-2 rounded-lg bg-accent1 text-black">Сохранить</button>
+                </div>
+              </form>
+            </div>
+          </main>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="mt-12 mb-12 text-center text-gray-500">© SC-TICKETS 2026</footer>
+  </div>
+
+  <script>
+    // Sample data
+    const sampleEvents = [
+      { id:1, title: 'Кино под открытым небом', date:'10.07.2026, 21:00', location:'Филиал МГУ, спортивная площадка', category:'Кино', sold:3, capacity:200, cover: null },
+      { id:2, title: 'Tech Talk', date:'10.07.2026, 21:00', location:'Филиал МГУ, конференц-зал', category:'Лекции', sold:6, capacity:200, cover: null },
+      { id:3, title: 'Весенний бал', date:'10.07.2026, 21:00', location:'Большой дворец', category:'Балы', sold:3, capacity:200, cover: null },
+      { id:4, title: 'Art Film Screening', date:'10.07.2026, 21:00', location:'Кинотеатр Арт', category:'Кино', sold:3, capacity:200, cover: null }
+    ];
+
+    // State
+    const state = { tab: 'afisha', events: sampleEvents, activeFilter: 'Все', query: '', category:'Все', location:'Все' };
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+      setupNav();
+      populateLocationFilter();
+      renderEvents();
+      setupControls();
+      renderTickets();
+      // default active nav
+      setActiveTab('afisha');
+    });
+
+    function setupNav(){
+      document.querySelectorAll('.nav-btn').forEach(btn=>{
+        btn.addEventListener('click', e=> setActiveTab(btn.dataset.tab));
+      });
+    }
+
+    function setActiveTab(tab){
+      state.tab = tab;
+      document.querySelectorAll('.tab-section').forEach(s => s.classList.add('hidden'));
+      document.getElementById(tab).classList.remove('hidden');
+      // nav active
+      document.querySelectorAll('.nav-btn').forEach(b=> b.classList.remove('bg-accent1','text-black'));
+      const activeBtn = document.querySelector(`.nav-btn[data-tab="${tab}"]`);
+      if(activeBtn){ activeBtn.classList.add('bg-accent1','text-black'); }
+      // special: show toast on tickets
+      if(tab === 'tickets') showToast();
+    }
+
+    function setupControls(){
+      document.getElementById('search').addEventListener('input', e=>{ state.query=e.target.value; renderEvents(); });
+      document.querySelectorAll('.filter-pill').forEach(b=>{
+        b.addEventListener('click', ()=>{ document.querySelectorAll('.filter-pill').forEach(x=>x.classList.remove('bg-accent2','text-black')); b.classList.add('bg-accent2','text-black'); state.activeFilter=b.dataset.filter; renderEvents(); });
+      });
+      document.getElementById('dateFilter').addEventListener('change', renderEvents);
+      document.getElementById('locationFilter').addEventListener('change', e=>{ state.location=e.target.value; renderEvents(); });
+      // back and register
+      document.getElementById('backToAfisha').addEventListener('click', e=>{ e.preventDefault(); setActiveTab('afisha'); });
+      document.getElementById('registerBtn').addEventListener('click', ()=>{ setActiveTab('tickets'); addTicket(); });
+    }
+
+    function populateLocationFilter(){
+      const locs = [...new Set(state.events.map(ev=>ev.location))];
+      const sel = document.getElementById('locationFilter');
+      locs.forEach(l=>{ const opt=document.createElement('option'); opt.value=l; opt.textContent=l; sel.appendChild(opt); });
+    }
+
+    function renderEvents(){
+      const grid = document.getElementById('eventsGrid'); grid.innerHTML='';
+      const q = state.query.toLowerCase();
+      const dateSel = document.getElementById('dateFilter').value;
+      const filtered = state.events.filter(ev=>{
+        if(state.activeFilter && state.activeFilter !== 'Все' && ev.category !== state.activeFilter) return false;
+        if(state.location && state.location !== 'Все' && ev.location !== state.location) return false;
+        if(q && !(ev.title.toLowerCase().includes(q) || ev.location.toLowerCase().includes(q) || (ev.category||'').toLowerCase().includes(q))) return false;
+        return true;
+      });
+
+      filtered.forEach(ev=>{
+        const pct = Math.round((ev.sold/ev.capacity)*100);
+        const card = document.createElement('a');
+        card.href='#';
+        card.className='block rounded-xl overflow-hidden bg-sheet2 transition-ease card-hover';
+        card.style.cursor='pointer';
+        card.innerHTML = `
+          <div class="h-44 bg-gradient-to-br from-[rgba(167,139,250,0.12)] to-[rgba(139,92,246,0.06)] flex items-end p-4 relative">
+            ${ev.category?`<div class=\"absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs font-semibold\">${ev.category}</div>`:''}
+            <div class="text-white font-semibold text-lg">${ev.title}</div>
+          </div>
+          <div class="p-4">
+            <div class="text-sm text-gray-400">📅 ${ev.date}</div>
+            <div class="text-sm text-gray-400 mt-1">📍 ${ev.location}</div>
+            <div class="mt-3">
+              <div class="w-full bg-[#0b0b0c] rounded-full h-2 overflow-hidden">
+                <div class="h-2 bg-gradient-to-r from-accent1 to-accent2" style="width:${Math.min(pct,100)}%"></div>
+              </div>
+              <div class="text-xs text-gray-400 mt-2">Занято ${pct}% · ${ev.capacity-ev.sold} осталось</div>
+            </div>
+            <div class="mt-4">
+              <button class="w-full py-2 rounded-full bg-[#0f1013] hover:bg-gradient-to-r from-accent1 to-accent2 text-sm transition-ease" data-id="${ev.id}">ПОЛУЧИТЕ БИЛЕТ</button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+        card.querySelector('button').addEventListener('click', (e)=>{ e.preventDefault(); showDetails(ev.id); setActiveTab('details'); });
+      });
+    }
+
+    function showDetails(id){
+      const ev = state.events.find(x=>x.id===id) || state.events[2];
+      document.getElementById('detailTitle').textContent = ev.title;
+      document.getElementById('detailPercent').textContent = Math.round((ev.sold/ev.capacity)*100) + '%';
+      document.getElementById('detailProgress').style.width = Math.round((ev.sold/ev.capacity)*100) + '%';
+      // banner background
+      const ban = document.getElementById('detailBanner');
+      ban.style.background = 'linear-gradient(120deg, rgba(167,139,250,0.12), rgba(139,92,246,0.08))';
+    }
+
+    // Tickets demo
+    function renderTickets(){
+      const container = document.querySelector('#tickets .grid');
+      container.innerHTML='';
+      const tickets = [
+        {title:'Кино под открытым небом', date:'10.07.2026', location:'Филиал МГУ', id:'a1b2c3d4', used:false, status:'Действителен'},
+        {title:'Весенний бал', date:'10.07.2026', location:'Большой дворец', id:'b2c3d4e5', used:false, status:'Действителен'},
+        {title:'Tech Talk', date:'10.07.2026', location:'Конференц-зал', id:'c3d4e5f6', used:true, status:'Использован'},
+        {title:'Art Film Screening', date:'10.07.2026', location:'Кинотеатр Арт', id:'d4e5f6g7', used:false, status:'Действителен'},
+      ];
+
+      tickets.forEach(t=>{
+        const pct = 3;
+        const card = document.createElement('div');
+        card.className='relative bg-paper rounded-xl overflow-hidden shadow-lg';
+        card.style.color = '#111827';
+        card.innerHTML = `
+          <div class="p-4 flex gap-4">
+            <div class="flex-1">
+              <div class="text-lg font-bold">${t.title}</div>
+              <div class="text-sm text-gray-600 mt-1">📅 ${t.date} · 📍 ${t.location}</div>
+              <div class="mt-4 text-sm">ID: <span class="font-mono">${t.id}</span></div>
+              <div class="mt-4">
+                <span class="inline-block px-3 py-1 rounded-full text-sm ${t.used? 'text-orange-800':'text-green-800'}" style="background:${t.used? 'rgba(245,158,11,0.06)':'rgba(16,185,129,0.06)'}">${t.status==='Действителен'? '✓ Действителен':'Истёк'}</span>
+              </div>
+            </div>
+            <div class="w-44 flex-shrink-0 border-l border-dashed border-gray-200/30 pl-4">
+              <div class="w-full h-28 rounded bg-stubPurple flex items-center justify-center">QR</div>
+              <div class="text-xs text-gray-600 mt-2">ПОКАЖИТЕ ПРИ ВХОДЕ</div>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function showToast(){
+      const t = document.getElementById('toast');
+      t.classList.remove('hidden');
+      setTimeout(()=> t.classList.add('hidden'), 3000);
+    }
+
+    function addTicket(){
+      // simulate receipt
+      showToast();
+      setTimeout(()=> setActiveTab('tickets'), 400);
+    }
+
+  </script>
+</body>
+</html>

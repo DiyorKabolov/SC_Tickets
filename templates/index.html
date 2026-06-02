@@ -51,12 +51,90 @@
 
   .afisha-sub { color: var(--muted); font-size: 14px; }
 
+  .afisha-controls {
+    display: grid;
+    gap: 16px;
+    margin: 32px auto 36px;
+    max-width: 980px;
+  }
+  .afisha-search {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    width: 100%;
+  }
+  .afisha-search input {
+    flex: 1;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.1);
+    background: #f6f5f2;
+    color: #232323;
+    font-size: 14px;
+    padding: 14px 18px;
+  }
+  .afisha-search button {
+    border: none;
+    background: #a898e0;
+    color: #fff;
+    border-radius: 14px;
+    padding: 0 22px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .afisha-filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .filter-select {
+    background: #f6f5f2;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-size: 14px;
+    color: #232323;
+    width: 100%;
+  }
+
   /* Сетка карточек */
   .events-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
     justify-content: center;
+  }
+  .event-card {
+    width: 360px;
+    max-width: 100%;
+    background: #f8f6f0;
+    border-radius: 16px;
+    overflow: hidden;
+    text-decoration: none;
+    color: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+  .event-card-cover {
+    height: 200px;
+    background-size: cover;
+    background-position: center;
+  }
+  .event-card-badge {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    background: rgba(26,28,30,0.85);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    z-index: 2;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   .event-card {
@@ -221,6 +299,30 @@
       <div class="afisha-sub">Выберите мероприятие и получите электронный билет</div>
     </div>
 
+    <form class="afisha-controls" method="get">
+      <div class="afisha-search">
+        <input type="search" name="q" placeholder="Поиск событий, мест, артистов..." value="{{ query or '' }}">
+        <button type="submit">Найти</button>
+      </div>
+      <div class="afisha-filters">
+        <select class="filter-select" name="category">
+          {% for item in categories %}
+            <option value="{{ item }}" {% if item == selected_category %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+        <select class="filter-select" name="date">
+          <option value="all" {% if selected_date == 'all' %}selected{% endif %}>Все даты</option>
+          <option value="this_week" {% if selected_date == 'this_week' %}selected{% endif %}>На этой неделе</option>
+          <option value="next_month" {% if selected_date == 'next_month' %}selected{% endif %}>В следующем месяце</option>
+        </select>
+        <select class="filter-select" name="location">
+          {% for item in locations %}
+            <option value="{{ item }}" {% if item == selected_location %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+
     {% if events %}
       <div class="events-grid">
 {% for event in events %}
@@ -231,6 +333,14 @@
   <a href="{{ url_for('events.event_page', event_id=event.id) }}"
      class="event-card"
      style="background:{{ card_bg }};color:{{ card_text }}">
+
+    {% if event.cover_image %}
+      <div class="event-card-cover"
+           style="background-image:url('{{ url_for('static', filename='event_covers/' ~ event.cover_image) }}')"></div>
+    {% endif %}
+    {% if event.category %}
+      <div class="event-card-badge">{{ event.category }}</div>
+    {% endif %}
 
     <div class="event-card-stripe"
          style="background:linear-gradient(90deg, {{ card_accent }}88, {{ card_accent }})"></div>

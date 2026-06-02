@@ -1,11 +1,14 @@
-﻿import uuid
+import uuid
 import qrcode
 import io
 import base64
-from flask import Blueprint, render_template, redirect, url_for, flash, session, send_file, jsonify
+from datetime import datetime
+from flask import Blueprint, render_template, redirect, url_for, flash, session, send_file, jsonify, request
+from flask_wtf.csrf import generate_csrf
 from app.database import (
     get_all_events_with_stats, get_event_by_id,
-    save_ticket, get_user_tickets, is_event_expired
+    save_ticket, get_user_tickets, is_event_expired,
+    parse_event_datetime, get_event_categories, get_event_locations
 )
 from app.auth import login_required
 from app.ticket import generate_ticket
@@ -16,27 +19,34 @@ events = Blueprint("events", __name__)
 def _is_ticket_expired(event_date_raw):
     return is_event_expired(event_date_raw)
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Ð°Ñ„Ð¸ÑˆÐ° â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ---------------------------------------- афиша ----------------------------------------
 
 @events.route("/")
 def index():
-    # Fixes N+1: Single query for all events and counts
-    all_events = get_all_events_with_stats()
-
-    for event in all_events:
-        event["available"] = event["capacity"] - event["sold"]
+    events_list = get_all_events_with_stats()
+    for event in events_list:
+        event["available"] = event["capacity"] - event.get("sold", 0)
         event["is_full"] = event["available"] <= 0
-        event["percent"] = round(event["sold"] / event["capacity"] * 100) if event["capacity"] else 0
+        event["percent"] = round(event.get("sold", 0) / event["capacity"] * 100) if event["capacity"] else 0
 
-    return render_template("index.html", events=all_events)
+    categories = get_event_categories()
+    locations = get_event_locations()
+    return render_template("index.html", events=events_list, categories=categories, locations=locations)
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð° ÑÐ¾Ð±Ñ‹Ñ‚Ð¸Ñ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+@events.route("/spa")
+@events.route("/spa-react")
+def react_spa():
+    # Redirect SPA routes back to the Jinja-based frontend
+    return redirect(url_for("events.index"))
+
+
+# ---------------------------------------- страница события ----------------------------------------
 
 @events.route("/event/<int:event_id>")
 def event_page(event_id):
     event = get_event_by_id(event_id)
     if event is None:
-        flash("ÐœÐµÑ€Ð¾Ð¿Ñ€Ð¸ÑÑ‚Ð¸Ðµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾", "error")
+        flash("Мероприятие не найдено", "error")
         return redirect(url_for("events.index"))
 
     # Stats for the specific event
@@ -48,36 +58,36 @@ def event_page(event_id):
 
     return render_template("event.html", event=event)
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚ÑŒ Ð±Ð¸Ð»ÐµÑ‚ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ---------------------------------------- получить билет ----------------------------------------
 
 @events.route("/event/<int:event_id>/buy", methods=["POST"])
 @login_required
 def buy_ticket(event_id):
     event = get_event_by_id(event_id)
     if event is None:
-        flash("ÐœÐµÑ€Ð¾Ð¿Ñ€Ð¸ÑÑ‚Ð¸Ðµ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾", "error")
+        flash("Мероприятие не найдено", "error")
         return redirect(url_for("events.index"))
 
     ticket_id = str(uuid.uuid4())
     result = save_ticket(ticket_id, user_id=session["user_id"], event_id=event_id)
 
     if result == "full":
-        flash("Ðš ÑÐ¾Ð¶Ð°Ð»ÐµÐ½Ð¸ÑŽ, Ð±Ð¸Ð»ÐµÑ‚Ñ‹ Ð·Ð°ÐºÐ¾Ð½Ñ‡Ð¸Ð»Ð¸ÑÑŒ", "error")
+        flash("К сожалению, билеты закончились", "error")
         return redirect(url_for("events.event_page", event_id=event_id))
     if result != "success":
-        flash("ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ð·Ð´Ð°Ñ‚ÑŒ Ð±Ð¸Ð»ÐµÑ‚. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ ÐµÑ‰Ñ‘ Ñ€Ð°Ð·.", "error")
+        flash("Не удалось создать билет. Попробуйте ещё раз.", "error")
         return redirect(url_for("events.event_page", event_id=event_id))
 
     try:
         generate_ticket(ticket_id=ticket_id, event=event)
-        flash("Ð‘Ð¸Ð»ÐµÑ‚ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½!", "success")
+        flash("Билет успешно получен!", "success")
     except Exception as e:
-        flash("Ð‘Ð¸Ð»ÐµÑ‚ ÑÐ¾Ð·Ð´Ð°Ð½, Ð½Ð¾ PDF Ð½Ðµ ÑÐ³ÐµÐ½ÐµÑ€Ð¸Ñ€Ð¾Ð²Ð°Ð»ÑÑ", "error")
-        print(f"ÐžÑˆÐ¸Ð±ÐºÐ° Ð³ÐµÐ½ÐµÑ€Ð°Ñ†Ð¸Ð¸ PDF: {e}")
+        flash("Билет создан, но PDF не сгенерировался", "error")
+        print(f"Ошибка генерации PDF: {e}")
 
     return redirect(url_for("events.cabinet"))
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Ð»Ð¸Ñ‡Ð½Ñ‹Ð¹ ÐºÐ°Ð±Ð¸Ð½ÐµÑ‚ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ---------------------------------------- личный кабинет ----------------------------------------
 
 @events.route("/cabinet")
 @login_required
@@ -124,7 +134,7 @@ def cabinet_status():
         })
     return jsonify({"tickets": payload})
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ ÑÐºÐ°Ñ‡Ð°Ñ‚ÑŒ PDF â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ---------------------------------------- скачать PDF ----------------------------------------
 
 @events.route("/ticket/<ticket_id>/pdf")
 @login_required
@@ -133,7 +143,7 @@ def download_ticket(ticket_id):
     ticket = next((t for t in user_tickets if t["ticket_id"] == ticket_id), None)
 
     if ticket is None:
-        flash("Ð‘Ð¸Ð»ÐµÑ‚ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", "error")
+        flash("Билет не найден", "error")
         return redirect(url_for("events.cabinet"))
 
     # Caching check in generate_ticket automatically handles existence
@@ -142,3 +152,114 @@ def download_ticket(ticket_id):
 
     return send_file(pdf_path, as_attachment=True,
                      download_name=f"ticket_{ticket_id[:8]}.pdf")
+
+
+# ----------------------------- SPA + API ---------------------------------
+
+
+
+@events.route("/api/events", methods=["GET"])
+def api_get_events():
+    q = request.args.get("q", "").strip()
+    category = request.args.get("category", "").strip()
+    location = request.args.get("location", "").strip()
+    date_filter = request.args.get("date", "all").strip().lower()
+
+    filters = {}
+    if q:
+        filters["q"] = q
+    if category and category.lower() != "all":
+        filters["category"] = category
+    if location and location.lower() != "all":
+        filters["location"] = location
+
+    events_list = get_all_events_with_stats(filters)
+    payload = []
+    for event in events_list:
+        dt = parse_event_datetime(event.get("date"))
+        event["datetime"] = dt.isoformat() if dt else None
+        event["available"] = event["capacity"] - event.get("sold", 0)
+        event["is_full"] = event["available"] <= 0
+        event["percent"] = round(event.get("sold", 0) / event["capacity"] * 100) if event["capacity"] else 0
+        cover = event.get("cover_image")
+        if cover:
+            try:
+                event["cover_url"] = url_for("static", filename=f"event_covers/{cover}")
+            except Exception:
+                event["cover_url"] = None
+        else:
+            event["cover_url"] = None
+        payload.append(event)
+
+    return jsonify({"events": payload})
+
+
+@events.route('/api/csrf', methods=['GET'])
+def api_csrf():
+    try:
+        token = generate_csrf()
+        return jsonify({'csrf_token': token})
+    except Exception:
+        return jsonify({'csrf_token': None}), 500
+
+
+
+ 
+@events.route("/api/events", methods=["POST"])
+def api_create_event():
+    # import admin_required and savers lazily to avoid circular imports
+    from app.auth import admin_required as _admin_required
+    from functools import wraps
+
+    # wrap actual handler to enforce admin check
+    def handler():
+        values = {
+            'title': request.form.get('title', '').strip(),
+            'description': request.form.get('description', '').strip(),
+            'date': request.form.get('date', '').strip(),
+            'location': request.form.get('location', '').strip(),
+            'category': request.form.get('category', '').strip(),
+            'capacity': request.form.get('capacity', '100').strip(),
+            'card_bg': request.form.get('card_bg', '#fdfdf5').strip(),
+            'card_accent': request.form.get('card_accent', '#a898e0').strip(),
+            'card_text': request.form.get('card_text', '#2a2a2a').strip(),
+        }
+
+        if not values['title'] or not values['date']:
+            return jsonify({'ok': False, 'message': 'Название и дата обязательны'}), 400
+        if parse_event_datetime(values['date']) is None:
+            return jsonify({'ok': False, 'message': 'Неверный формат даты'}), 400
+
+        try:
+            capacity = int(values['capacity'])
+            if capacity <= 0:
+                raise ValueError
+        except ValueError:
+            return jsonify({'ok': False, 'message': 'Вместимость должна быть положительным числом'}), 400
+
+        template_file = request.files.get('ticket_template')
+        cover_file = request.files.get('cover_image')
+
+        # savers live in admin module
+        from app.admin import _save_ticket_template, _save_cover_image
+
+        ticket_template = None
+        if template_file and template_file.filename:
+            ticket_template = _save_ticket_template(template_file)
+
+        cover_image = None
+        if cover_file and cover_file.filename:
+            cover_image = _save_cover_image(cover_file)
+
+        event_id = create_event(values['title'], values['description'], values['date'],
+                                values['location'], values['category'], capacity,
+                                values['card_bg'], values['card_accent'], values['card_text'],
+                                ticket_template, cover_image)
+
+        ev = get_event_by_id(event_id)
+        return jsonify({'ok': True, 'event': ev}), 201
+
+    # apply admin_required wrapper
+    wrapped = _admin_required(handler)
+    return wrapped()
+

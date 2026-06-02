@@ -247,6 +247,19 @@
       </div>
 
       <div class="form-group">
+        <label class="form-label">Категория</label>
+        <select class="form-input" name="category" style="appearance:none;">
+          <option value="" {% if not event or not event.category %}selected{% endif %}>Без категории</option>
+          <option value="Кино" {% if event and event.category == 'Кино' %}selected{% endif %}>Кино</option>
+          <option value="Лекции" {% if event and event.category == 'Лекции' %}selected{% endif %}>Лекции</option>
+          <option value="Балы" {% if event and event.category == 'Балы' %}selected{% endif %}>Балы</option>
+          <option value="Театр" {% if event and event.category == 'Театр' %}selected{% endif %}>Театр</option>
+          <option value="Концерт" {% if event and event.category == 'Концерт' %}selected{% endif %}>Концерт</option>
+          <option value="Новый" {% if event and event.category == 'Новый' %}selected{% endif %}>Новый</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label class="form-label">Шаблон PDF билета</label>
         {% if event and event.ticket_template %}
           <div class="form-note" style="margin-bottom:.75rem;color:var(--muted);font-size:13px">
@@ -256,6 +269,22 @@
         <input class="form-input" type="file" name="ticket_template" accept="application/pdf">
         <div class="form-note" style="margin-top:.5rem;color:var(--muted);font-size:13px">
           Загрузите PDF-файл шаблона, который будет использоваться для этого события. Оставьте пустым, чтобы использовать шаблон по умолчанию.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Обложка мероприятия</label>
+        {% if event and event.cover_image %}
+          <div class="form-note" style="margin-bottom:.75rem;color:var(--muted);font-size:13px">
+            Текущая обложка:
+            <span style="display:inline-block;margin-top:6px;padding:6px 10px;background:rgba(0,0,0,0.05);border-radius:12px;">
+              {{ event.cover_image }}
+            </span>
+          </div>
+        {% endif %}
+        <input class="form-input" type="file" name="cover_image" accept="image/png,image/jpeg,image/webp">
+        <div class="form-note" style="margin-top:.5rem;color:var(--muted);font-size:13px">
+          Изображение будет использоваться в карточке афиши.
         </div>
       </div>
 

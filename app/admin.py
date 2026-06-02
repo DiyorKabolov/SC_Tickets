@@ -12,7 +12,9 @@ from app.auth import admin_required
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "assets", "ticket_templates"))
+COVER_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "static", "event_covers"))
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
+os.makedirs(COVER_DIR, exist_ok=True)
 
 admin = Blueprint("admin", __name__, url_prefix="/admin")
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -20,6 +22,10 @@ HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 def _allowed_template(filename):
     return filename.lower().endswith(".pdf")
+
+
+def _allowed_cover_image(filename):
+    return filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
 
 
 def _save_ticket_template(file):
@@ -34,11 +40,32 @@ def _save_ticket_template(file):
     return target_name
 
 
+def _save_cover_image(file):
+    if not file or not file.filename:
+        return None
+    filename = secure_filename(file.filename)
+    if not _allowed_cover_image(filename):
+        return None
+    target_name = f"{uuid.uuid4().hex}_{filename}"
+    target_path = os.path.join(COVER_DIR, target_name)
+    file.save(target_path)
+    return target_name
+
+
 def _delete_ticket_template(filename):
     if not filename:
         return
     try:
         os.remove(os.path.join(TEMPLATE_DIR, filename))
+    except OSError:
+        pass
+
+
+def _delete_cover_image(filename):
+    if not filename:
+        return
+    try:
+        os.remove(os.path.join(COVER_DIR, filename))
     except OSError:
         pass
 
@@ -54,6 +81,7 @@ def _event_form_values():
         "description": request.form.get("description", "").strip(),
         "date": request.form.get("date", "").strip(),
         "location": request.form.get("location", "").strip(),
+        "category": request.form.get("category", "").strip(),
         "capacity": request.form.get("capacity", "100").strip(),
         "card_bg": _normalize_color(request.form.get("card_bg"), "#fdfdf5"),
         "card_accent": _normalize_color(request.form.get("card_accent"), "#a898e0"),
@@ -92,6 +120,7 @@ def event_create():
     if request.method == "POST":
         values = _event_form_values()
         template_file = request.files.get("ticket_template")
+        cover_file = request.files.get("cover_image")
 
         if not all([values["title"], values["date"]]):
             flash("Название и дата обязательны", "error")
@@ -114,11 +143,19 @@ def event_create():
                     flash("Загрузите корректный PDF-файл шаблона билета", "error")
                     return render_template("admin/event_form.html", event=values)
 
-            create_event(values["title"], values["description"], values["date"], values["location"], capacity,
-                         values["card_bg"], values["card_accent"], values["card_text"], ticket_template)
+            cover_image = None
+            if cover_file and cover_file.filename:
+                cover_image = _save_cover_image(cover_file)
+                if cover_image is None:
+                    flash("Загрузите корректное изображение обложки", "error")
+                    return render_template("admin/event_form.html", event=values)
+
+            create_event(values["title"], values["description"], values["date"],
+                         values["location"], values["category"], capacity,
+                         values["card_bg"], values["card_accent"], values["card_text"],
+                         ticket_template, cover_image)
             flash(f"Мероприятие «{values['title']}» создано", "success")
             return redirect(url_for("admin.events_list"))
-
     return render_template("admin/event_form.html", event=None)
 
 
@@ -134,7 +171,10 @@ def event_edit(event_id):
         values = _event_form_values()
         values["id"] = event_id
         values["ticket_template"] = event.get("ticket_template")
+        values["category"] = values.get("category") or event.get("category", "")
+        values["cover_image"] = event.get("cover_image")
         template_file = request.files.get("ticket_template")
+        cover_file = request.files.get("cover_image")
 
         if not all([values["title"], values["date"]]):
             flash("Название и дата обязательны", "error")
@@ -159,8 +199,19 @@ def event_edit(event_id):
                 _delete_ticket_template(ticket_template)
                 ticket_template = new_template
 
-            update_event(event_id, values["title"], values["description"], values["date"], values["location"], capacity,
-                         values["card_bg"], values["card_accent"], values["card_text"], ticket_template)
+            cover_image = event.get("cover_image")
+            if cover_file and cover_file.filename:
+                new_cover = _save_cover_image(cover_file)
+                if new_cover is None:
+                    flash("Загрузите корректное изображение обложки", "error")
+                    return render_template("admin/event_form.html", event=values)
+                _delete_cover_image(cover_image)
+                cover_image = new_cover
+
+            update_event(event_id, values["title"], values["description"], values["date"],
+                         values["location"], values["category"], capacity,
+                         values["card_bg"], values["card_accent"], values["card_text"],
+                         ticket_template, cover_image)
             flash("Мероприятие обновлено", "success")
             return redirect(url_for("admin.events_list"))
 
@@ -176,6 +227,7 @@ def event_delete(event_id):
         return redirect(url_for("admin.events_list"))
 
     tickets_count = get_event_tickets_count(event_id)
+    _delete_cover_image(event.get("cover_image"))
     delete_event(event_id)
     flash(f"Мероприятие «{event['title']}» удалено. Билетов удалено: {tickets_count}", "success")
     return redirect(url_for("admin.events_list"))

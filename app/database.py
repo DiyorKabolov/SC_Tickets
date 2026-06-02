@@ -1,4 +1,4 @@
-﻿import sqlite3
+import sqlite3
 import bcrypt
 import os
 from datetime import datetime, timedelta, time
@@ -50,11 +50,13 @@ def init_db():
                 description TEXT,
                 date TEXT NOT NULL,
                 location TEXT,
+                category TEXT DEFAULT '',
                 capacity INTEGER DEFAULT 100,
                 card_bg TEXT DEFAULT '#fdfdf5',
                 card_accent TEXT DEFAULT '#a898e0',
                 card_text TEXT DEFAULT '#2a2a2a',
                 ticket_template TEXT,
+                cover_image TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -87,6 +89,15 @@ def init_db():
             cursor.execute("ALTER TABLE events ADD COLUMN ticket_template TEXT")
         except sqlite3.OperationalError:
             pass
+
+        for col, default in [
+            ("category", "''"),
+            ("cover_image", "NULL"),
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT DEFAULT {default}")
+            except sqlite3.OperationalError:
+                pass
 
         for col, definition in [
             ("verify_token_created_at", "TIMESTAMP"),
@@ -129,7 +140,7 @@ def is_event_expired(event_date_raw):
     event_dt = parse_event_datetime(event_date_raw)
     return bool(event_dt and event_dt < datetime.now())
 
-# â”€â”€ Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ───────────────────── Users ─────────────────────
 
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -218,34 +229,62 @@ def verify_email_token(user_id, code):
         conn.commit()
         return True
 
-# â”€â”€ Events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ──────────────────── Events ────────────────────
 
-def create_event(title, description, date, location, capacity,
+def create_event(title, description, date, location, category, capacity,
                  card_bg="#fdfdf5", card_accent="#a898e0", card_text="#2a2a2a",
-                 ticket_template=None):
+                 ticket_template=None, cover_image=None):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO events (title, description, date, location, capacity,
-                                card_bg, card_accent, card_text, ticket_template)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (title, description, date, location, capacity,
-              card_bg, card_accent, card_text, ticket_template))
+            INSERT INTO events (title, description, date, location, category, capacity,
+                                card_bg, card_accent, card_text, ticket_template, cover_image)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (title, description, date, location, category, capacity,
+              card_bg, card_accent, card_text, ticket_template, cover_image))
         conn.commit()
         return cursor.lastrowid
 
-def get_all_events_with_stats():
+def get_all_events_with_stats(filters=None):
     """Optimized: returns events with ticket counts in one query (Fixes N+1)"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        query = """
             SELECT e.*, COUNT(t.id) as sold
             FROM events e
             LEFT JOIN tickets t ON e.id = t.event_id
-            GROUP BY e.id
-            ORDER BY e.date ASC
-        """)
+        """
+        params = []
+        if filters:
+            clauses = []
+            if filters.get("q"):
+                q = f"%{filters['q']}%"
+                clauses.append("(e.title LIKE ? OR e.description LIKE ? OR e.location LIKE ?)")
+                params.extend([q, q, q])
+            if filters.get("category"):
+                clauses.append("e.category = ?")
+                params.append(filters["category"])
+            if filters.get("location"):
+                clauses.append("e.location = ?")
+                params.append(filters["location"])
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+        query += " GROUP BY e.id ORDER BY e.date ASC"
+        cursor.execute(query, params)
         return [dict(row) for row in cursor.fetchall()]
+
+def get_event_categories():
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT category FROM events WHERE category != '' ORDER BY category ASC")
+        return [row[0] for row in cursor.fetchall()]
+
+
+def get_event_locations():
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT location FROM events WHERE location != '' ORDER BY location ASC")
+        return [row[0] for row in cursor.fetchall()]
 
 def get_event_by_id(event_id):
     with get_db() as conn:
@@ -260,18 +299,18 @@ def get_event_tickets_count(event_id):
         cursor.execute("SELECT COUNT(*) FROM tickets WHERE event_id = ?", (event_id,))
         return cursor.fetchone()[0]
 
-def update_event(event_id, title, description, date, location, capacity,
+def update_event(event_id, title, description, date, location, category, capacity,
                  card_bg="#fdfdf5", card_accent="#a898e0", card_text="#2a2a2a",
-                 ticket_template=None):
+                 ticket_template=None, cover_image=None):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE events
-            SET title=?, description=?, date=?, location=?, capacity=?,
-                card_bg=?, card_accent=?, card_text=?, ticket_template=?
+            SET title=?, description=?, date=?, location=?, category=?, capacity=?,
+                card_bg=?, card_accent=?, card_text=?, ticket_template=?, cover_image=?
             WHERE id=?
-        """, (title, description, date, location, capacity,
-              card_bg, card_accent, card_text, ticket_template, event_id))
+        """, (title, description, date, location, category, capacity,
+              card_bg, card_accent, card_text, ticket_template, cover_image, event_id))
         conn.commit()
 
 def delete_event(event_id):
@@ -282,7 +321,7 @@ def delete_event(event_id):
         conn.commit()
         return cursor.rowcount > 0
 
-# â”€â”€ Tickets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ──────────────────── Tickets ────────────────────
 
 def save_ticket(ticket_id, user_id=None, event_id=None):
     with get_db() as conn:
@@ -435,7 +474,7 @@ def check_ticket(ticket_id):
             conn.rollback()
             return {"ok": False, "message": "Ошибка проверки билета"}
 
-# â”€â”€ Admin stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ────────────────── Admin stats ──────────────────
 
 def get_stats():
     with get_db() as conn:

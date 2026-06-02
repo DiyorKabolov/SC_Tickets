@@ -32,6 +32,31 @@
     margin: 0 auto;
   }
 
+  .event-cover {
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 28px;
+    min-height: 260px;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 28px 80px rgba(0,0,0,0.35);
+  }
+
+  .event-category {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.85);
+    color: #1a1a2e;
+    margin-bottom: 18px;
+  }
+
   .back-link {
     display: inline-flex;
     align-items: center;
@@ -223,6 +248,11 @@
       ← Все мероприятия
     </a>
 
+    {% if event.cover_image %}
+      <div class="event-cover"
+           style="background-image:url('{{ url_for('static', filename='event_covers/' ~ event.cover_image) }}')"></div>
+    {% endif %}
+
     <div class="event-layout">
 
       <!-- Левая часть -->
@@ -234,6 +264,9 @@
         <h1 class="event-title">{{ event.title }}</h1>
 
         <div class="event-meta">
+          {% if event.category %}
+            <div class="event-category">{{ event.category }}</div>
+          {% endif %}
           {% if event.location %}
             <div class="meta-chip">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none">

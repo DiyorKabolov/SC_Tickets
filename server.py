@@ -1,4 +1,4 @@
-﻿import os
+import os
 from pyngrok import ngrok
 from app import create_app
 from app.database import init_db
