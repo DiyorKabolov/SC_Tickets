@@ -20,6 +20,8 @@ else:
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
     try:
         yield conn
     finally:
@@ -70,7 +72,7 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 used INTEGER DEFAULT 0,
                 FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (event_id) REFERENCES events(id)
+                FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
             )
         """)
 
@@ -108,7 +110,6 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
 
-        cursor.execute("DROP INDEX IF EXISTS idx_tickets_user_event")
         conn.commit()
 
 
@@ -139,6 +140,10 @@ def parse_event_datetime(event_date_raw):
 def is_event_expired(event_date_raw):
     event_dt = parse_event_datetime(event_date_raw)
     return bool(event_dt and event_dt < datetime.now())
+
+
+def _now_iso():
+    return datetime.now().replace(microsecond=0).isoformat(sep=" ")
 
 # ───────────────────── Users ─────────────────────
 
@@ -189,9 +194,9 @@ def set_verify_token(user_id, token):
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE users
-            SET verify_token=?, verify_token_created_at=CURRENT_TIMESTAMP, verify_attempts=0
+            SET verify_token=?, verify_token_created_at=?, verify_attempts=0
             WHERE id=?
-        """, (token, user_id))
+        """, (token, _now_iso(), user_id))
         conn.commit()
 
 def verify_email_token(user_id, code):
@@ -329,11 +334,14 @@ def save_ticket(ticket_id, user_id=None, event_id=None):
             cursor = conn.cursor()
             cursor.execute("BEGIN IMMEDIATE")
 
-            cursor.execute("SELECT capacity FROM events WHERE id = ?", (event_id,))
+            cursor.execute("SELECT capacity, date FROM events WHERE id = ?", (event_id,))
             event = cursor.fetchone()
             if not event:
                 conn.rollback()
                 return "not_found"
+            if is_event_expired(event["date"]):
+                conn.rollback()
+                return "expired"
 
             cursor.execute("SELECT COUNT(*) FROM tickets WHERE event_id = ?", (event_id,))
             sold = cursor.fetchone()[0]

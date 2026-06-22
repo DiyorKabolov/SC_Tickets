@@ -164,6 +164,7 @@ yarn-error.log*
 pnpm-debug.log*
 static/spa-react/node_modules/
 static/spa-react/dist/
+static/spa-react-build/
 app/static/
 
 # Project-specific databases and directories

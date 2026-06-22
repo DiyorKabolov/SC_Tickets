@@ -1,33 +1,47 @@
-import qrcode
 import io
 import os
 import uuid
-from reportlab.pdfgen import canvas
+
+import qrcode
+from PyPDF2 import PdfReader, PdfWriter
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from PyPDF2 import PdfReader, PdfWriter
+from reportlab.pdfgen import canvas
+
 from app.database import init_db
 
-# --- Конфиг ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Попробуем стандартный путь, если нет — можно положить шрифт в папку проекта
-FONT_PATH = "C:/Windows/Fonts/arial.ttf"
-if not os.path.exists(FONT_PATH):
-    # Запасной вариант (например, если шрифт в корне проекта)
-    FONT_PATH = os.path.join(BASE_DIR, "arial.ttf")
-
+OUTPUT_DIR = os.path.join(BASE_DIR, "..", "Generated_tickets")
 TEMPLATE_DIR = os.path.join(BASE_DIR, "..", "assets", "ticket_templates")
 DEFAULT_TEMPLATE_PATH = os.path.join(BASE_DIR, "..", "assets", "ghb.pdf")
-OUTPUT_DIR = os.path.join(BASE_DIR, "..", "Generated_tickets")
-# --------------
+
+DEFAULT_FONT_CANDIDATES = [
+    os.getenv("PDF_FONT_PATH", ""),
+    os.path.join(BASE_DIR, "arial.ttf"),
+    "C:/Windows/Fonts/arial.ttf",
+    "C:/Windows/Fonts/segoeui.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+]
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
-if os.path.exists(FONT_PATH):
-    pdfmetrics.registerFont(TTFont('Arial', FONT_PATH))
-else:
-    print(f"Warning: Font not found at {FONT_PATH}. PDF might have issues with Cyrillic.")
+
+
+def _register_pdf_font():
+    for font_path in DEFAULT_FONT_CANDIDATES:
+        if font_path and os.path.exists(font_path):
+            try:
+                pdfmetrics.registerFont(TTFont("SCTicketsFont", font_path))
+                return "SCTicketsFont"
+            except Exception:
+                continue
+    return "Helvetica"
+
+
+PDF_FONT_NAME = _register_pdf_font()
 
 
 def _get_template_path(event):
@@ -38,24 +52,15 @@ def _get_template_path(event):
     return DEFAULT_TEMPLATE_PATH
 
 
-def generate_ticket(ticket_id: str, event: dict = None):
-    # Кэширование: если билет уже есть, просто возвращаем путь
-    result_path = os.path.join(OUTPUT_DIR, f"ticket_{ticket_id}.pdf")
-    if os.path.exists(result_path):
-        return result_path
-
-    # Unique QR file per ticket to avoid race conditions
-    qr_path = os.path.join(OUTPUT_DIR, f"qr_{ticket_id}.png")
+def _build_overlay(ticket_id, event=None):
+    buffer = io.BytesIO()
     qr_img = qrcode.make(ticket_id)
-    qr_img.save(qr_path)
+    qr_img.save(buffer, format="PNG")
+    buffer.seek(0)
 
     packet = io.BytesIO()
     c = canvas.Canvas(packet, pagesize=A4)
-    
-    # Используем Arial если он загружен
-    font_name = "Arial" if os.path.exists(FONT_PATH) else "Helvetica"
-    c.setFont(font_name, 10)
-    
+    c.setFont(PDF_FONT_NAME, 10)
     c.drawString(50, 750, f"ID: {ticket_id}")
 
     if event:
@@ -63,33 +68,35 @@ def generate_ticket(ticket_id: str, event: dict = None):
         c.drawString(50, 720, f"Дата: {event['date']}")
         c.drawString(50, 705, f"Место: {event.get('location', '—')}")
 
-    c.drawImage(qr_path, 200, 300, width=400, height=400)
+    c.drawImage(ImageReader(buffer), 200, 300, width=400, height=400, mask="auto")
     c.save()
     packet.seek(0)
+    return packet
 
 
+def generate_ticket(ticket_id: str, event: dict = None):
+    result_path = os.path.join(OUTPUT_DIR, f"ticket_{ticket_id}.pdf")
+    if os.path.exists(result_path):
+        return result_path
+
+    overlay_pdf = _build_overlay(ticket_id, event)
     template_path = _get_template_path(event)
+
     if not os.path.exists(template_path):
-        # Если шаблона нет, создаем просто PDF с данными
         with open(result_path, "wb") as f_out:
-            f_out.write(packet.getbuffer())
-    else:
-        template_pdf = PdfReader(template_path)
-        overlay_pdf  = PdfReader(packet)
-        page = template_pdf.pages[0]
-        page.merge_page(overlay_pdf.pages[0])
+            f_out.write(overlay_pdf.getbuffer())
+        return result_path
 
-        output_pdf = PdfWriter()
-        output_pdf.add_page(page)
+    template_pdf = PdfReader(template_path)
+    overlay_reader = PdfReader(overlay_pdf)
+    page = template_pdf.pages[0]
+    page.merge_page(overlay_reader.pages[0])
 
-        with open(result_path, "wb") as f_out:
-            output_pdf.write(f_out)
+    output_pdf = PdfWriter()
+    output_pdf.add_page(page)
 
-    # Cleanup temp QR image
-    try:
-        os.remove(qr_path)
-    except OSError:
-        pass
+    with open(result_path, "wb") as f_out:
+        output_pdf.write(f_out)
 
     return result_path
 

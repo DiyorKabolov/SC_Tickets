@@ -227,6 +227,7 @@ def event_delete(event_id):
         return redirect(url_for("admin.events_list"))
 
     tickets_count = get_event_tickets_count(event_id)
+    _delete_ticket_template(event.get("ticket_template"))
     _delete_cover_image(event.get("cover_image"))
     delete_event(event_id)
     flash(f"Мероприятие «{event['title']}» удалено. Билетов удалено: {tickets_count}", "success")

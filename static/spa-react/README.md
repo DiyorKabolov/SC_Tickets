@@ -13,14 +13,13 @@ npm run dev
 Then open the dev server URL (shown by Vite), or visit the Flask route if serving static files:
 
 - Dev: http://localhost:5173 (default Vite)
-- Flask integration: http://127.0.0.1:5000/spa-react (serves `static/spa-react/index.html`)
+- Flask integration: http://127.0.0.1:5000/spa-react (serves `static/spa-react-build/index.html` when built)
 
 Build for production:
 
 ```bash
 npm run build
-# optionally copy build output into Flask static serve location
-# cp -r dist/* ../spa-react/  # (example)
+# build output is written to `static/spa-react-build/`
 ```
 
 Notes:

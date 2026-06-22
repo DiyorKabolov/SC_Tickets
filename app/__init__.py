@@ -1,5 +1,4 @@
 import os
-import secrets
 from datetime import timedelta
 from flask import Flask, request, jsonify, flash, redirect, url_for
 from flask_wtf.csrf import CSRFProtect
@@ -22,14 +21,22 @@ def pluralize(n, one, few, many):
 
 def create_app():
     template_folder = os.path.join(os.path.dirname(__file__), "..", "templates")
-    app = Flask(__name__, template_folder=template_folder)
+    static_folder = os.path.join(os.path.dirname(__file__), "..", "static")
+    app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 
-    app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
+    secret_key = os.getenv("SECRET_KEY")
+    if not secret_key:
+        secret_key = "dev-sc-tickets-secret-key-change-me"
+        print("Warning: SECRET_KEY is not set. Using a development fallback key.")
+
+    app.secret_key = secret_key
     app.permanent_session_lifetime = timedelta(days=30)
     app.config["SESSION_REFRESH_EACH_REQUEST"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0") == "1"
+    app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH", str(25 * 1024 * 1024)))
+    app.config["WTF_CSRF_HEADERS"] = ["X-CSRFToken", "X-CSRF-Token"]
 
     csrf.init_app(app)
 

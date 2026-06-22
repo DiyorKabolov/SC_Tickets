@@ -24,7 +24,9 @@ export default function App() {
 
   const categories = useMemo(() => {
     const set = new Set(FORMAT_OPTIONS)
-    events.forEach((event) => set.add(event.category || 'Без категории'))
+    events.forEach((event) => {
+      if (event.category) set.add(event.category)
+    })
     return Array.from(set)
   }, [events])
 
@@ -33,26 +35,28 @@ export default function App() {
     return events.filter((event) => {
       const matchesQuery =
         !lowerQuery ||
-        [event.title, event.location, event.category]
-          .some((value) => String(value || '').toLowerCase().includes(lowerQuery))
+        [event.title, event.location, event.category].some((value) =>
+          String(value || '')
+            .toLowerCase()
+            .includes(lowerQuery)
+        )
       const matchesCategory =
-        activeCategory === 'Все' ||
-        (event.category || 'Без категории') === activeCategory
+        activeCategory === 'Все' || event.category === activeCategory
       return matchesQuery && matchesCategory
     })
   }, [events, query, activeCategory])
 
-  const fallbackCover = '/static/design/page1_img1.jpeg'
+  const openEvent = (eventId) => {
+    window.location.href = `/event/${eventId}`
+  }
 
   return (
     <div className="page-shell">
+      {/* ── Header ── */}
       <header className="page-header">
         <div className="brand">
-          <div className="brand-mark">SC</div>
-          <div>
-            <div className="brand-name">SC-TICKETS</div>
-            <div className="brand-meta">Лиловая афиша</div>
-          </div>
+          <div className="brand-icon">🎫</div>
+          <div className="brand-name">SC-TICKETS</div>
         </div>
 
         <nav className="page-nav">
@@ -70,14 +74,16 @@ export default function App() {
 
         <div className="header-actions">
           <span className="user-name">Диёр</span>
-          <button type="button" className="admin-button">ADMIN</button>
+          <span className="admin-badge">ADMIN</span>
         </div>
       </header>
 
+      {/* ── Content ── */}
       {activeTab === 'afisha' ? (
         <main className="afisha-page">
+          {/* Search + filters */}
           <section className="search-row">
-            <div className="search-input">
+            <div className="search-input-wrap">
               <span className="search-icon">🔍</span>
               <input
                 value={query}
@@ -105,37 +111,75 @@ export default function App() {
             </div>
           </section>
 
+          {/* Cards */}
           <section className="cards-grid">
             {filteredEvents.length > 0 ? (
-              filteredEvents.map((event) => (
-                <article key={event.id} className="event-card">
-                  <div
-                    className="event-cover"
-                    style={{
-                      backgroundImage: `linear-gradient(180deg, rgba(18, 8, 33, 0.2), rgba(18, 8, 33, 0.9)), url(${event.cover_url || fallbackCover})`,
-                    }}
-                  >
-                    <span className="event-label">
-                      {(event.category || 'Без категории').toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="event-body">
-                    <h2>{event.title}</h2>
-                    <div className="event-meta-row">
-                      <span className="event-meta-item">📅 {event.date}</span>
-                      <span className="event-meta-item">📍 {event.location || 'Не указано'}</span>
+              filteredEvents.map((event) => {
+                const sold = event.sold || 0
+                const capacity = event.capacity || 1
+                const percent = Math.round((sold / capacity) * 100)
+                const available = capacity - sold
+                const hasCover = !!event.cover_url
+
+                return (
+                  <article key={event.id} className="event-card">
+                    <div
+                      className="event-cover"
+                      style={
+                        hasCover
+                          ? { backgroundImage: `url(${event.cover_url})` }
+                          : undefined
+                      }
+                    >
+                      {!hasCover && (
+                        <span className="event-cover-placeholder">
+                          600 × 400
+                        </span>
+                      )}
+                      {event.category && (
+                        <span className="event-label">{event.category}</span>
+                      )}
                     </div>
-                    <div className="event-progress-row">
-                      <span className="event-progress-text">Занято {event.percent}%</span>
-                      <span className="event-available">{event.available} мест осталось</span>
+
+                    <div className="event-body">
+                      <h2>{event.title}</h2>
+                      <div className="event-meta-row">
+                        <span className="event-meta-item">
+                          <span className="meta-icon">📅</span>
+                          {event.date}
+                        </span>
+                        <span className="event-meta-item">
+                          <span className="meta-icon">📍</span>
+                          {event.location || 'Не указано'}
+                        </span>
+                      </div>
+                      <div className="event-progress-row">
+                        <span className="event-progress-text">
+                          Занято {percent}%
+                        </span>
+                        <span className="event-available">
+                          {available} мест осталось
+                        </span>
+                      </div>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${Math.min(percent, 100)}%` }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="event-action"
+                        disabled={available <= 0}
+                        onClick={() => openEvent(event.id)}
+                      >
+                        <span className="action-icon">🎟</span>
+                        {available <= 0 ? 'мест нет' : 'получить билет'}
+                      </button>
                     </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${event.percent}%` }} />
-                    </div>
-                    <button type="button" className="event-action">Получить билет</button>
-                  </div>
-                </article>
-              ))
+                  </article>
+                )
+              })
             ) : (
               <div className="empty-state">
                 События не найдены. Измените запрос или выберите другую категорию.

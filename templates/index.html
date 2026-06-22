@@ -117,11 +117,30 @@
     transition: transform 0.2s, box-shadow 0.2s;
     position: relative;
   }
+  .event-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 28px 70px rgba(0,0,0,0.5);
+  }
+
   .event-card-cover {
-    height: 200px;
+    position: absolute;
+    inset: 0;
     background-size: cover;
     background-position: center;
+    z-index: 0;
+    transition: transform 0.4s ease;
   }
+  .event-card:hover .event-card-cover {
+    transform: scale(1.05);
+  }
+
+  .event-card-gradient {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
   .event-card-badge {
     position: absolute;
     top: 18px;
@@ -137,33 +156,34 @@
     letter-spacing: 0.08em;
   }
 
-  .event-card {
-    width: 360px;
-    max-width: 100%;
-    background: #f8f6f0;
-    border-radius: 16px;
-    overflow: hidden;
-    text-decoration: none;
-    color: #1a1a2e;
+  .event-content-wrapper {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-    transition: transform 0.2s, box-shadow 0.2s;
-    position: relative;
+    height: 100%;
   }
-  .event-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 28px 70px rgba(0,0,0,0.5);
+
+  .event-card.has-cover .event-content-wrapper {
+    justify-content: flex-end;
+  }
+
+  .event-card.no-cover .event-content-wrapper {
+    justify-content: flex-start;
   }
 
   .event-card-stripe {
-    height: 3px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
     background: linear-gradient(90deg, #c8c0f0, #a898e0);
+    z-index: 2;
   }
 
   .event-body {
     padding: 22px 20px 16px;
-    flex: 1;
   }
 
   .event-date {
@@ -331,49 +351,55 @@
   {% set card_text   = event.card_text   or '#2a2a2a' %}
 
   <a href="{{ url_for('events.event_page', event_id=event.id) }}"
-     class="event-card"
+     class="event-card {% if event.cover_image %}has-cover{% else %}no-cover{% endif %}"
      style="background:{{ card_bg }};color:{{ card_text }}">
+
+    <div class="event-card-stripe"
+         style="background:linear-gradient(90deg, {{ card_accent }}88, {{ card_accent }})"></div>
 
     {% if event.cover_image %}
       <div class="event-card-cover"
-           style="background-image:url('{{ url_for('static', filename='event_covers/' ~ event.cover_image) }}')"></div>
+           style="background-image:url('{{ url_for('static', filename='event_covers/' ~ event.cover_image) }}')">
+      </div>
+      <div class="event-card-gradient" 
+           style="background: linear-gradient(to top, {{ card_bg }}ff 0%, {{ card_bg }}cc 30%, {{ card_bg }}00 100%);">
+      </div>
     {% endif %}
     {% if event.category %}
       <div class="event-card-badge">{{ event.category }}</div>
     {% endif %}
 
-    <div class="event-card-stripe"
-         style="background:linear-gradient(90deg, {{ card_accent }}88, {{ card_accent }})"></div>
-
-    <div class="event-body">
-      <div class="event-date" style="color:{{ card_accent }}">{{ event.date }}</div>
-      <div class="event-title" style="color:{{ card_text }}">{{ event.title }}</div>
-      {% if event.location %}
-        <div class="event-location" style="color:{{ card_text }}88">
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px">
-            <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 3.75 4.5 8.5 4.5 8.5s4.5-4.75 4.5-8.5c0-2.485-2.015-4.5-4.5-4.5z" stroke="currentColor" stroke-width="1.5"/>
-            <circle cx="8" cy="6" r="1.5" stroke="currentColor" stroke-width="1.5"/>
-          </svg>
-          {{ event.location }}
-        </div>
-      {% endif %}
-      {% if event.description %}
-        <div class="event-desc" style="color:{{ card_text }}88">{{ event.description }}</div>
-      {% endif %}
-    </div>
-
-    <div class="event-footer" style="border-top:1px solid {{ card_text }}10">
-      <div class="capacity-bar" style="background:{{ card_text }}12">
-        <div class="capacity-fill {% if event.is_full %}full{% elif event.percent > 70 %}almost{% endif %}"
-             style="width:{{ [event.sold / event.capacity * 100, 100] | min }}%;
-                    background:{% if event.is_full %}#e05050{% elif event.percent > 70 %}#e0a030{% else %}{{ card_accent }}{% endif %}">
-        </div>
+    <div class="event-content-wrapper">
+      <div class="event-body">
+        <div class="event-date" style="color:{{ card_accent }}">{{ event.date }}</div>
+        <div class="event-title" style="color:{{ card_text }}">{{ event.title }}</div>
+        {% if event.location %}
+          <div class="event-location" style="color:{{ card_text }}88">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px">
+              <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 3.75 4.5 8.5 4.5 8.5s4.5-4.75 4.5-8.5c0-2.485-2.015-4.5-4.5-4.5z" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="8" cy="6" r="1.5" stroke="currentColor" stroke-width="1.5"/>
+            </svg>
+            {{ event.location }}
+          </div>
+        {% endif %}
+        {% if event.description %}
+          <div class="event-desc" style="color:{{ card_text }}88">{{ event.description }}</div>
+        {% endif %}
       </div>
-      <div class="capacity-text" style="color:{{ card_text }}88">
-        {% if event.is_full %}Мест нет{% else %}{{ event.available }} мест{% endif %}
+
+      <div class="event-footer" style="border-top:1px solid {{ card_text }}10">
+        <div class="capacity-bar" style="background:{{ card_text }}12">
+          <div class="capacity-fill {% if event.is_full %}full{% elif event.percent > 70 %}almost{% endif %}"
+               style="width:{{ [event.sold / event.capacity * 100, 100] | min }}%;
+                      background:{% if event.is_full %}#e05050{% elif event.percent > 70 %}#e0a030{% else %}{{ card_accent }}{% endif %}">
+          </div>
+        </div>
+        <div class="capacity-text" style="color:{{ card_text }}88">
+          {% if event.is_full %}Мест нет{% else %}{{ event.available }} мест{% endif %}
+        </div>
+        <div class="event-arrow"
+             style="background:{{ card_accent }}20;color:{{ card_accent }}">→</div>
       </div>
-      <div class="event-arrow"
-           style="background:{{ card_accent }}20;color:{{ card_accent }}">→</div>
     </div>
 
   </a>
